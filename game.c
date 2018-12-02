@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
-void move(int pos, int player, int * cells, int seeds_computer, int seeds_player);
+
+int * move(int pos, int * cells);
 int requestMove(int player);
 
 void printBoard(int * b, int seeds_computer, int seeds_player) {
@@ -33,7 +35,9 @@ int main(void) {
 
     position = requestMove(player);
 
-    move(position, player, cells, seeds_computer, seeds_player);
+    int * new_cells = move(position, cells);
+    printBoard(new_cells, seeds_computer, seeds_player);
+
     return 0;    
 }
 
@@ -55,15 +59,17 @@ int requestMove(int player) {
     return pos;
 }
 
-void move(int pos, int player, int * cells, int seeds_computer, int seeds_player) {
-    int stones = cells[pos];
-    cells[pos] = 0;
+int * move(int pos, int * cells) {
+    int * cellsc = (int*)malloc(sizeof(int)*12);
+    memcpy(cellsc, cells, sizeof(int)*12);
+    int stones = cellsc[pos];
+    cellsc[pos] = 0;
 
     for (int i = 0; i < stones; i++) {
         int idx = (pos + i + 1) % 12;
         // add in logic to skip the original pos
-        cells[idx] += 1;
+        cellsc[idx] += 1;
     }
 
-    printBoard(cells, seeds_computer, seeds_player);
+    return cellsc;
 }
