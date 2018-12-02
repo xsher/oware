@@ -3,8 +3,9 @@
 #include <string.h>
 
 
-int * move(int pos, int * cells);
-int requestMove(int player);
+int * move(int pos, int player, int * cells);
+int requestMove(int player, int * cells);
+int capture(int org_pos, int last_pos, int player, int * cells);
 
 void printBoard(int * b, int seeds_computer, int seeds_player) {
     printf("\nComputer side\n");
@@ -23,6 +24,8 @@ int main(void) {
     // Initialize all the initial values
 //    int max_seeds = 48;  // #seeds per hole * #holes
     int cells[12] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+//    int cells_player[6] = {4, 4, 4, 4, 4, 4};
+//    int cells_computer[6] = {4, 4, 4, 4, 4, 4};
     int seeds_player = 0;
     int seeds_computer= 0;
     int position; // fix this
@@ -33,35 +36,65 @@ int main(void) {
     printf("Who starts? 0: computer, 1: player.\n");
     scanf("%d", &player);
 
-    position = requestMove(player);
+    position = requestMove(player, cells);
 
-    int * new_cells = move(position, cells);
-    printBoard(new_cells, seeds_computer, seeds_player);
+    int over = 0;
+    int * new_cells = (int*)malloc(sizeof(int)*12);
+    memcpy(new_cells, cells, sizeof(int)*12);
+
+    // change this to the condition such that the game is not over yet
+    // can do the check based on the seeds_player and seeds_computer
+    while (over < 10) {
+        // note that it loops
+        int last_pos = position + new_cells[position];
+        new_cells = move(position, player, new_cells);
+        int scores_gain = capture(position, last_pos, player, new_cells);
+        if (player == 0) {
+            seeds_computer += scores_gain;
+        } else {
+            seeds_player += scores_gain;
+        }
+        printBoard(new_cells, seeds_computer, seeds_player);
+        player = (player == 1) ? 0 : 1;
+        position = requestMove(player, new_cells);
+        // check for whether you can capture
+        over++;
+    }
 
     return 0;    
 }
 
-int requestMove(int player) {
+int requestMove(int player, int * cells) {
     int pos;
+    // validate move in this function!
 
     if (player == 0) {
         do {
-            printf("Which position to sow? Between 0 to 5.\n");
+            printf("Which position to sow? Choices: ");
+            for (int i=0; i < 6; i++) {
+                if (cells[i] > 0) printf("%d ", i);
+            }
+            printf("\n");
             scanf("%d", &pos);
-        } while(!(pos >= 0 && pos <= 5));
+        } while(!(pos >= 0 && pos <= 5) || cells[pos] == 0);
     } else {
         do {
-            printf("Which position to sow? Between 6 to 11.\n");
+            printf("Which position to sow? Choices: ");
+            for (int i=6; i < 12; i++) {
+                if (cells[i] > 0) printf("%d ", i);
+            }
+            printf("\n");
             scanf("%d", &pos);
-        } while(!(pos >= 6 && pos <= 11));
+        } while(!(pos >= 6 && pos <= 11) || cells[pos] == 0);
     }
 
     return pos;
 }
 
-int * move(int pos, int * cells) {
+int * move(int pos, int player, int * cells) {
     int * cellsc = (int*)malloc(sizeof(int)*12);
     memcpy(cellsc, cells, sizeof(int)*12);
+
     int stones = cellsc[pos];
     cellsc[pos] = 0;
 
@@ -72,4 +105,23 @@ int * move(int pos, int * cells) {
     }
 
     return cellsc;
+}
+
+int capture(int org_pos, int last_pos, int player, int * cells) {
+    // take note of edge case when it loops the entire round
+    // check based on last pos backwards to see if can capture
+    // can we only seeds on our side?! verify this.
+    int scores = 0;
+    int first_index = (player == 0) ? 6 : 0;
+    for (int i = last_pos; i > org_pos && i >= first_index; i--) {
+        int idx = i % 12;
+        if (idx >= first_index && cells[idx] >= 2 && cells[idx] <= 3) {
+            scores += cells[idx];
+            cells[idx] = 0;
+        } else {
+            break;
+        }
+    }
+
+    return scores;
 }
