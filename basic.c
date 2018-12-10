@@ -56,7 +56,6 @@ void generateTree(int * nodes, int initial, int depth, int parent_idx) {
     int newDepth = depth - 1;
     if (newDepth > 0) {
         for (int i = 0; i < 6; i++) {
-            int parentIndex = index + i;
             // printf("parent Index %d \n", parentIndex);
             generateTree(nodes, initial, newDepth, index + i);
         }

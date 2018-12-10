@@ -10,15 +10,22 @@ struct Position {
     int seeds_computer; // seeds taken by the computer
     int index;        // position's index in the array
     int valid_move; // 0 if not valid
+    int evaluation;
+    int hole; // which hole was chosen
 };
 
 typedef struct Position Pos;
 
+struct Move {
+    Pos position;
+    int score;
+};
+
 int * move(int pos, int player, int * cells);
 int capture(int org_pos, int last_pos, int player, int * cells);
-void generateMoves(Pos* nodes, Pos position, int depth, int parent_idx);
+struct Move generateMoves(Pos* nodes, Pos position, int depth, int parent_idx);
 Pos* computeNextMove(Pos initial, int maxDepth);
-
+int evaluate(Pos position);
 
 
 void printArray(int * cells, int size) {
@@ -50,7 +57,7 @@ int main(void) {
     initial_pos.seeds_computer = 0;
     initial_pos.index = -1;
 
-    int maxDepth = 3;
+    int maxDepth = 10;
     computeNextMove(initial_pos, maxDepth);
 }
 
@@ -73,14 +80,26 @@ Pos* computeNextMove(Pos initial, int maxDepth) {
 
     // starts from index 0
     nodes[0] = initial;
-    generateMoves(nodes, initial, maxDepth, 0);
-    printStruct(nodes, sizeOfArray);
+    struct Move nextMove;
+    nextMove = generateMoves(nodes, initial, maxDepth, 0);
+
+    printArray(nextMove.position.cells, 12);
+    printf("player %d, seedsplayer %d, seedscomp %d ", nextMove.position.player, nextMove.position.seeds_player, nextMove.position.seeds_computer);
+    printf("index %d, valid_move %d, moved hole %d ", nextMove.position.index, nextMove.position.valid_move, nextMove.position.hole);
+    printf("evalution score %d\n", nextMove.score);
+    // printStruct(nodes, sizeOfArray);
 }
 
+int evaluate(Pos position) {
+    return position.seeds_computer - position.seeds_player;
+}
 
-void generateMoves(Pos* nodes, Pos position, int depth, int parent_idx) {
+struct Move generateMoves(Pos* nodes, Pos position, int depth, int parent_idx) {
     if (depth == 0) {
-        return;
+        struct Move move;
+        move.position = position;
+        move.score = position.evaluation;
+        return move;
     }
 
     Pos possib_moves[6];
@@ -90,6 +109,7 @@ void generateMoves(Pos* nodes, Pos position, int depth, int parent_idx) {
     int * cells = (int*)malloc(sizeof(int)*12);
     memcpy(cells, position.cells, sizeof(int)*12);
 
+    // start of generation of children nodes
     // for each position we have 6 possible moves for each player
     // we will now determine which moves are valid and store it in the array
 
@@ -117,8 +137,10 @@ void generateMoves(Pos* nodes, Pos position, int depth, int parent_idx) {
                 newPos.seeds_player = position.seeds_player + scores_gain;
                 newPos.seeds_computer = position.seeds_computer;
             }
+            newPos.hole = start_index;
             newPos.index = parent_idx;
             newPos.valid_move = 1;
+            newPos.evaluation = evaluate(newPos);
         }
 
         // if it is not valid just store the intialized pos with nothing, might want to reconsider this
@@ -129,15 +151,28 @@ void generateMoves(Pos* nodes, Pos position, int depth, int parent_idx) {
 
     int index = (parent_idx * 6) + 1;
     memcpy(&nodes[index], &possib_moves[0], sizeof(Pos)*6);
+    // end of generation of children nodes and saving them into the nodes array
 
+
+
+    // if player == 0 i.e. the computer we are maximising
+    // if player == 1 i.e. the player we are minimizing
     int newDepth = depth - 1;
-    if (newDepth > 0) {
-        for (int i = 0; i < 6; i++) {
-            if (possib_moves[i].valid_move == 1) {
-                generateMoves(nodes, possib_moves[i], newDepth, index + i);
+    struct Move bestMove;
+    bestMove.score = (position.player == 0) ? -999999999 : 999999999;
+
+    // generating evaluation
+    struct Move childPos;
+    for (int i = 0; i < 6; i++) {
+        if (possib_moves[i].valid_move == 1) {
+            childPos = generateMoves(nodes, possib_moves[i], newDepth, index + i);
+            if ((position.player == 0 && childPos.position.evaluation > bestMove.score) || (position.player == 1 && childPos.position.evaluation < bestMove.score)) {
+                bestMove.score = childPos.position.evaluation;
+                bestMove.position = (childPos.position.index > 0) ? nodes[childPos.position.index] : childPos.position;
             }
         }
     }
+    return bestMove;
 }
 
 int * move(int pos, int player, int * cells) {

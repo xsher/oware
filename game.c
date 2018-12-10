@@ -6,6 +6,7 @@
 int * move(int pos, int player, int * cells);
 int requestMove(int player, int * cells);
 int capture(int org_pos, int last_pos, int player, int * cells);
+//int generate_tree(int * cells, int player, int depth);
 
 void printBoard(int * b, int seeds_computer, int seeds_player) {
     printf("\nComputer side\n");
@@ -27,7 +28,7 @@ int main(void) {
 //    int cells_player[6] = {4, 4, 4, 4, 4, 4};
 //    int cells_computer[6] = {4, 4, 4, 4, 4, 4};
     int seeds_player = 0;
-    int seeds_computer= 0;
+    int seeds_computer = 0;
     int position; // fix this
 
     printBoard(cells, seeds_computer, seeds_player);
@@ -92,17 +93,30 @@ int requestMove(int player, int * cells) {
 }
 
 int * move(int pos, int player, int * cells) {
+    // skip original position- change it to while loop
     int * cellsc = (int*)malloc(sizeof(int)*12);
     memcpy(cellsc, cells, sizeof(int)*12);
 
     int stones = cellsc[pos];
     cellsc[pos] = 0;
 
-    for (int i = 0; i < stones; i++) {
+    int i = 0;
+    while (stones > 0) {
         int idx = (pos + i + 1) % 12;
-        // add in logic to skip the original pos
+        // moving the pos ahead
+        i++;
+
+        // skip original hole
+        if (idx == pos) continue;
+
         cellsc[idx] += 1;
+        stones--;
     }
+//    for (int i = 0; i < stones; i++) {
+//        int idx = (pos + i + 1) % 12;
+//        // add in logic to skip the original pos
+//        cellsc[idx] += 1;
+//    }
 
     return cellsc;
 }
@@ -110,7 +124,7 @@ int * move(int pos, int player, int * cells) {
 int capture(int org_pos, int last_pos, int player, int * cells) {
     // take note of edge case when it loops the entire round
     // check based on last pos backwards to see if can capture
-    // can we only seeds on our side?! verify this.
+    // can we only seeds on our side?! yes if the last position is on the other side, reset to the max on our side.
     int scores = 0;
     int first_index = (player == 0) ? 6 : 0;
     for (int i = last_pos; i > org_pos && i >= first_index; i--) {
@@ -125,3 +139,6 @@ int capture(int org_pos, int last_pos, int player, int * cells) {
 
     return scores;
 }
+
+// write a recursive function that generates tree up to depth 3
+// int generate_tree(int * cells, int player, int depth) {}
