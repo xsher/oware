@@ -1,12 +1,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
+struct Position {
+    int cells[12]; // each cell contains a certain number of seeds
+    int player; // boolean true if the computer has to play and false otherwise
+    int seeds_player; // seeds taken by the player
+    int seeds_computer; // seeds taken by the computer
+    int index;        // position's index in the array
+    int valid_move; // 0 if not valid
+    int evaluation;
+    int hole; // which hole was chosen
+};
+
+typedef struct Position Pos;
+
+struct Move {
+    Pos position;
+    int score;
+};
 
 int * move(int pos, int player, int * cells);
 int requestMove(int player, int * cells);
 int capture(int org_pos, int last_pos, int player, int * cells);
-//int generate_tree(int * cells, int player, int depth);
+// Pos computePlayerMove(Pos position);
+struct Move generateMoves(Pos* nodes, Pos position, int depth, int parent_idx);
+Pos computeComputerMove(Pos initial, int maxDepth);
+int evaluate(Pos position);
+
+void printArray(int * cells, int size) {
+    for (int i = 0; i<size; i++) {
+        printf("Cell %d, value %d\n", i, cells[i]);
+    }
+    printf("\n");
+}
 
 void printBoard(int * b, int seeds_computer, int seeds_player) {
     printf("\nComputer side\n");
@@ -23,46 +51,177 @@ void printBoard(int * b, int seeds_computer, int seeds_player) {
 int main(void) {
 
     // Initialize all the initial values
-//    int max_seeds = 48;  // #seeds per hole * #holes
-    int cells[12] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
-//    int cells_player[6] = {4, 4, 4, 4, 4, 4};
-//    int cells_computer[6] = {4, 4, 4, 4, 4, 4};
-    int seeds_player = 0;
-    int seeds_computer = 0;
-    int position; // fix this
+    int maxDepth = 8;
+    Pos position;
+    for (int i = 0; i < 12; i++) position.cells[i] = 4;
+    position.player = 0;
+    position.seeds_player = 0;
+    position.seeds_computer = 0;
+    position.index = -1;
 
-    printBoard(cells, seeds_computer, seeds_player);
+    printBoard(position.cells, position.seeds_computer, position.seeds_player);
 
     int player; // 0 represents comp, 0 represents player
     printf("Who starts? 0: computer, 1: player.\n");
-    scanf("%d", &player);
+    scanf("%d", &position.player);
 
-    position = requestMove(player, cells);
+    printf("Starts with player: %d\n", position.player);
+    position.hole = requestMove(player, position.cells);
 
     int over = 0;
-    int * new_cells = (int*)malloc(sizeof(int)*12);
-    memcpy(new_cells, cells, sizeof(int)*12);
 
     // change this to the condition such that the game is not over yet
     // can do the check based on the seeds_player and seeds_computer
     while (over < 10) {
-        // note that it loops
-        int last_pos = position + new_cells[position];
-        new_cells = move(position, player, new_cells);
-        int scores_gain = capture(position, last_pos, player, new_cells);
-        if (player == 0) {
-            seeds_computer += scores_gain;
+        printf("Currently player %d turn\n", position.player);
+        int last_pos = position.hole + position.cells[position.hole];
+        if (position.player == 1) {
+            memcpy(position.cells, move(position.hole, position.player, position.cells), sizeof(int)*12);
+            int scores_gain = capture(position.hole, last_pos, position.player, position.cells);
+            position.seeds_player += scores_gain;
         } else {
-            seeds_player += scores_gain;
+            position = computeComputerMove(position, maxDepth);
+            int scores_gain = capture(position.hole, last_pos, position.player, position.cells);
+            position.seeds_computer += scores_gain;
         }
-        printBoard(new_cells, seeds_computer, seeds_player);
-        player = (player == 1) ? 0 : 1;
-        position = requestMove(player, new_cells);
-        // check for whether you can capture
+        // printf("Printing board here\n");
+        printBoard(position.cells, position.seeds_computer, position.seeds_player);
+        // printf("original player %d", position.player);
+        position.player = (position.player == 1) ? 0 : 1;
+        // make it such that the computer move is done here as well?? 
+        // should we extract this into another function separately?
+        // printf("Player now is %d\n", position.player);
+        if (position.player == 1) {
+            position.hole = requestMove(position.player, position.cells);
+        }
         over++;
     }
 
     return 0;    
+}
+
+// Pos computePlayerMove(Pos position) {
+//     int last_pos = position.hole + position.cells[position.hole];
+//     memcpy(position.cells, move(position.hole, position.player, position.cells), sizeof(int)*12);
+//     int scores_gain = capture(position.hole, last_pos, position.player, position.cells);
+//     if (position.player == 0) {
+//         position.seeds_computer += scores_gain;
+//     } else {
+//         position.seeds_player += scores_gain;
+//     }
+//     return position;
+// }
+
+Pos computeComputerMove(Pos initial, int maxDepth) {
+    // printf("Comes into the computerMove\n");
+    // for now this returns all moves , next version we should return the best move only
+    int sizeOfArray = pow(6, maxDepth + 1) / 5;
+    Pos * nodes = (struct Position *)malloc(sizeof(struct Position)*sizeOfArray);
+
+    // starts from index 0
+    nodes[0] = initial;
+    struct Move nextMove;
+    // printf("Going to genereateMoves\n");
+    nextMove = generateMoves(nodes, initial, maxDepth, 0);
+    // printf("Finish generating move\n");
+
+    // printArray(nextMove.position.cells, 12);
+    // printf("player %d, seedsplayer %d, seedscomp %d ", nextMove.position.player, nextMove.position.seeds_player, nextMove.position.seeds_computer);
+    // printf("index %d, valid_move %d, moved hole %d ", nextMove.position.index, nextMove.position.valid_move, nextMove.position.hole);
+    // printf("evalution score %d\n", nextMove.score);
+    // printf("Inside the computer\n");
+    // printBoard(nextMove.position.cells, nextMove.position.seeds_computer, nextMove.position.seeds_player);
+
+    nextMove.position.player = 0;
+    // printf("Computer Move, return player is %d", nextMove.position.player);
+    // printf("Returning position for the computer\n");
+    return nextMove.position;
+    // printStruct(nodes, sizeOfArray);
+}
+
+int evaluate(Pos position) {
+    return position.seeds_computer - position.seeds_player;
+}
+
+struct Move generateMoves(Pos* nodes, Pos position, int depth, int parent_idx) {
+    if (depth == 0) {
+        struct Move move;
+        move.position = position;
+        move.score = position.evaluation;
+        return move;
+    }
+
+    Pos possib_moves[6];
+    int idx = 0;
+
+    // to prevent updates on original cell
+    int * cells = (int*)malloc(sizeof(int)*12);
+    memcpy(cells, position.cells, sizeof(int)*12);
+
+    // start of generation of children nodes
+    // for each position we have 6 possible moves for each player
+    // we will now determine which moves are valid and store it in the array
+
+    int start_index = (position.player == 0) ? 0 : 6;
+    int final_index = (position.player == 0) ? 5 : 11;
+
+    while (start_index <= final_index) {
+
+        Pos newPos;
+
+        // check for valid move
+        if (cells[start_index] > 0) {
+            int last_pos = start_index + cells[start_index];
+
+            int * newMove = move(start_index, position.player, cells);
+            memcpy(newPos.cells, newMove, sizeof(int) * 12);
+            // newPos.cells = move(start_index, position.player, cells);
+
+            newPos.player = (position.player == 0) ? 1 : 0;
+            int scores_gain = capture(start_index, last_pos, position.player, cells);
+            if (position.player == 0) {
+                newPos.seeds_computer = position.seeds_computer + scores_gain;
+                newPos.seeds_player = position.seeds_player;
+            } else {
+                newPos.seeds_player = position.seeds_player + scores_gain;
+                newPos.seeds_computer = position.seeds_computer;
+            }
+            newPos.hole = start_index;
+            newPos.index = parent_idx;
+            newPos.valid_move = 1;
+            newPos.evaluation = evaluate(newPos);
+        }
+
+        // if it is not valid just store the intialized pos with nothing, might want to reconsider this
+        possib_moves[idx] = newPos;
+        idx++;
+        start_index++;
+    }
+
+    int index = (parent_idx * 6) + 1;
+    memcpy(&nodes[index], &possib_moves[0], sizeof(Pos)*6);
+    // end of generation of children nodes and saving them into the nodes array
+
+
+
+    // if player == 0 i.e. the computer we are maximising
+    // if player == 1 i.e. the player we are minimizing
+    int newDepth = depth - 1;
+    struct Move bestMove;
+    bestMove.score = (position.player == 0) ? -999999999 : 999999999;
+
+    // generating evaluation
+    struct Move childPos;
+    for (int i = 0; i < 6; i++) {
+        if (possib_moves[i].valid_move == 1) {
+            childPos = generateMoves(nodes, possib_moves[i], newDepth, index + i);
+            if ((position.player == 0 && childPos.position.evaluation > bestMove.score) || (position.player == 1 && childPos.position.evaluation < bestMove.score)) {
+                bestMove.score = childPos.position.evaluation;
+                bestMove.position = (childPos.position.index > 0) ? nodes[childPos.position.index] : childPos.position;
+            }
+        }
+    }
+    return bestMove;
 }
 
 int requestMove(int player, int * cells) {
@@ -112,12 +271,6 @@ int * move(int pos, int player, int * cells) {
         cellsc[idx] += 1;
         stones--;
     }
-//    for (int i = 0; i < stones; i++) {
-//        int idx = (pos + i + 1) % 12;
-//        // add in logic to skip the original pos
-//        cellsc[idx] += 1;
-//    }
-
     return cellsc;
 }
 
@@ -139,6 +292,3 @@ int capture(int org_pos, int last_pos, int player, int * cells) {
 
     return scores;
 }
-
-// write a recursive function that generates tree up to depth 3
-// int generate_tree(int * cells, int player, int depth) {}
