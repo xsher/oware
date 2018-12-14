@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
@@ -26,8 +27,8 @@ struct Move {
 int * move(int pos, int player, int * cells);
 int requestMove(int player, int * cells);
 int capture(int org_pos, int last_pos, int player, int * cells);
-// Pos computePlayerMove(Pos position);
-struct Move generateMoves(Pos* nodes, Pos position, int depth, int parent_idx);
+struct Move generateMoves(Pos* nodes, Pos position, bool maximisingPlayer,
+    int depth, int parent_idx);
 Pos computeComputerMove(Pos initial, int maxDepth);
 int evaluate(Pos position);
 
@@ -42,9 +43,11 @@ void printBoard(int * b, int seeds_computer, int seeds_player) {
     printf("\nComputer side\n");
     printf("         0     1     2     3     4     5\n");
     printf("-------------------------------------------------\n");
-    printf("|%5d|%5d|%5d|%5d|%5d|%5d|%5d|%5s|\n", seeds_computer, b[0], b[1], b[2], b[3], b[4], b[5], "");
+    printf("|%5d|%5d|%5d|%5d|%5d|%5d|%5d|%5s|\n", seeds_computer,
+            b[0], b[1], b[2], b[3], b[4], b[5], "");
     printf("       -----------------------------------\n");
-    printf("|%5s|%5d|%5d|%5d|%5d|%5d|%5d|%5d|\n", "", b[11], b[10], b[9], b[8], b[7], b[6], seeds_player);
+    printf("|%5s|%5d|%5d|%5d|%5d|%5d|%5d|%5d|\n", "",
+            b[11], b[10], b[9], b[8], b[7], b[6], seeds_player);
     printf("-------------------------------------------------\n");
     printf("         11    10    9     8     7     6\n");
     printf("Player side\n\n");
@@ -74,20 +77,24 @@ int main(void) {
     int scores_gain;
 
     // while it is not game over yet
-    while (position.seeds_computer <= maxSeeds/2 || position.seeds_player <= maxSeeds/2) {
+    while (position.seeds_computer <= maxSeeds/2 ||
+            position.seeds_player <= maxSeeds/2) {
         printf("Player %d turn\n", position.player);
         if (position.player == 1) {
             position.hole = requestMove(position.player, position.cells);
             position.last_pos = position.hole + position.cells[position.hole];
-            memcpy(position.cells, move(position.hole, position.player, position.cells), sizeof(int)*12);
-            scores_gain = capture(position.hole, position.last_pos, position.player, position.cells);
+            memcpy(position.cells, move(position.hole, position.player,
+                   position.cells), sizeof(int)*12);
+            scores_gain = capture(position.hole, position.last_pos,
+                                  position.player, position.cells);
             position.seeds_player += scores_gain;
         } else {
             struct timeval start, end;
             gettimeofday(&start, NULL);
             position = computeComputerMove(position, maxDepth);
             // calculate last pos in the computermove
-            scores_gain = capture(position.hole, position.last_pos, position.player, position.cells);
+            scores_gain = capture(position.hole, position.last_pos,
+                                  position.player, position.cells);
             position.seeds_computer += scores_gain;
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
@@ -109,7 +116,8 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     nodes[0] = initial;
 
     struct Move nextMove;
-    nextMove = generateMoves(nodes, initial, maxDepth, 0);
+    bool maximisingPlayer = true;
+    nextMove = generateMoves(nodes, initial, maximisingPlayer, maxDepth, 0);
     return nextMove.position;
 }
 
@@ -117,7 +125,8 @@ int evaluate(Pos position) {
     return position.seeds_computer - position.seeds_player;
 }
 
-struct Move generateMoves(Pos * nodes, Pos position, int depth, int parent_idx) {
+struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
+                          int depth, int parent_idx) {
     if (depth == 0) {
         struct Move move;
         move.position = position;
@@ -162,7 +171,7 @@ struct Move generateMoves(Pos * nodes, Pos position, int depth, int parent_idx) 
             newPos.parent_idx = parent_idx;
             newPos.valid_move = 1;
             newPos.evaluation = evaluate(newPos);
-            newPos.player = position.player;
+            newPos.player = (maximisingPlayer == true) ? 0 : 1;
         } else {
             newPos.valid_move = 0;
         }
@@ -188,10 +197,13 @@ struct Move generateMoves(Pos * nodes, Pos position, int depth, int parent_idx) 
     struct Move childPos;
     for (int i = 0; i < 6; i++) {
         if (possib_moves[i].valid_move == 1) {
-            childPos = generateMoves(nodes, possib_moves[i], newDepth, index + i);
-            if ((position.player == 0 && childPos.position.evaluation > bestMove.score) || (position.player == 1 && childPos.position.evaluation < bestMove.score)) {
+            childPos = generateMoves(nodes, possib_moves[i],
+                        (maximisingPlayer == true) ? false : true, newDepth, index + i);
+            if ((maximisingPlayer && childPos.position.evaluation > bestMove.score) ||
+                    (!maximisingPlayer && childPos.position.evaluation < bestMove.score)) {
                 bestMove.score = childPos.position.evaluation;
-                bestMove.position = (childPos.position.parent_idx > 0) ? nodes[childPos.position.parent_idx] : childPos.position;
+                bestMove.position = (childPos.position.parent_idx > 0) ?
+                                nodes[childPos.position.parent_idx] : childPos.position;
             }
         }
     }
@@ -251,7 +263,8 @@ int * move(int pos, int player, int * cells) {
 int capture(int org_pos, int last_pos, int player, int * cells) {
     // take note of edge case when it loops the entire round
     // check based on last pos backwards to see if can capture
-    // can we only seeds on our side?! yes if the last position is on the other side, reset to the max on our side.
+    // can we only seeds on our side?! yes if the last position is on
+    // the other side, reset to the max on our side.
     int scores = 0;
     int first_index = (player == 0) ? 6 : 0;
     for (int i = last_pos; i > org_pos && i >= first_index; i--) {
