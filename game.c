@@ -147,7 +147,7 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     if (org_cells[nextMove.position.hole] > 11) {
         nextMove.position.last_pos += 1;
     }
-    printf("Score for the move: %d\n", nextMove.position.evaluation);
+    printf("Score for the move: %d\n", nextMove.score);
     return nextMove.position;
 }
 
@@ -247,9 +247,9 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
             // for every children generated, if it is a valid move, and the player is computer, we will get max evaluation
             // if the player is "player" we will get the min evaluation
             if (childPos.position.valid_move == 1) {
-                if ((childPos.position.player == 0 && childPos.position.evaluation > bestMove.score) ||
-                        (childPos.position.player == 1 && childPos.position.evaluation < bestMove.score)) {
-                    bestMove.score = (childPos.position.parent_idx > 0) ? childPos.position.evaluation : bestMove.score;
+                if ((childPos.position.player == 0 && childPos.score > bestMove.score) ||
+                        (childPos.position.player == 1 && childPos.score < bestMove.score)) {
+                    bestMove.score = childPos.score;
                     bestMove.position = (childPos.position.parent_idx > 0) ?
                                     nodes[childPos.position.parent_idx] : childPos.position;
                 }
