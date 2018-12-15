@@ -7,7 +7,7 @@
 
 struct Position {
     int cells[12];      // each cell contains a certain number of seeds
-    int player;         // boolean true if the computer has to play and false otherwise
+    int player;         // 0 if the computer's play and 1 otherwise
     int seeds_player;   // seeds taken by the player
     int seeds_computer; // seeds taken by the computer
     int parent_idx;     // position's index in the array
@@ -24,6 +24,7 @@ struct Move {
     int score;
 };
 
+void startGame(Pos position, int maxDepth);
 int * move(int pos, int player, int * cells);
 int requestMove(int player, int * cells);
 int capture(int org_pos, int last_pos, int looped, int player, int * cells);
@@ -60,7 +61,6 @@ void printBoard(int * b, int seeds_computer, int seeds_player) {
 int main(void) {
 
     // Initialize all the initial values
-    int maxSeeds = 48;
     int maxDepth;
     Pos position;
     for (int i = 0; i < 12; i++) position.cells[i] = 4;
@@ -80,7 +80,12 @@ int main(void) {
     } while (position.player != 0 && position.player != 1);
     printf("\nStarting the game with player: %d\n", position.player);
 
+    startGame(position, maxDepth);
+}
+
+void startGame(Pos position, int maxDepth) {
     int scores_gain;
+    int maxSeeds = 48;
 
     // while it is not game over yet
     while (position.seeds_computer <= maxSeeds/2 ||
@@ -116,7 +121,8 @@ int main(void) {
         printBoard(position.cells, position.seeds_computer, position.seeds_player);
         position.player = (position.player == 1) ? 0 : 1;
     }
-    return 0;    
+
+    printf("GAME OVER.\n");
 }
 
 Pos computeComputerMove(Pos initial, int maxDepth) {
