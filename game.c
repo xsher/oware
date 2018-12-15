@@ -26,7 +26,7 @@ struct Move {
 
 int * move(int pos, int player, int * cells);
 int requestMove(int player, int * cells);
-int capture(int org_pos, int last_pos, int player, int * cells);
+int capture(int org_pos, int last_pos, int looped, int player, int * cells);
 struct Move generateMoves(Pos* nodes, Pos position, bool maximisingPlayer,
     int depth, int parent_idx);
 Pos computeComputerMove(Pos initial, int maxDepth);
@@ -36,7 +36,7 @@ void printArray(int * cells, int size) {
     for (int i = 0; i<size; i++) {
         printf("%d  ", cells[i]);
     }
-    printf("\n\n");
+    printf("\n");
 }
 
 void printBoard(int * b, int seeds_computer, int seeds_player) {
@@ -82,27 +82,33 @@ int main(void) {
     while (position.seeds_computer <= maxSeeds/2 ||
             position.seeds_player <= maxSeeds/2) {
         printf("\nPlayer %d turn\n", position.player);
+
         if (position.player == 1) {
             position.hole = requestMove(position.player, position.cells);
+            int looped = (position.cells[position.hole] > 11) ? 1 : 0;
             position.last_pos = position.hole + position.cells[position.hole];
+
             if (position.cells[position.hole] > 11) {
                 position.last_pos += 1;
             }
+
             memcpy(position.cells, move(position.hole, position.player,
                    position.cells), sizeof(int)*12);
-            scores_gain = capture(position.hole, position.last_pos,
+            scores_gain = capture(position.hole, position.last_pos, looped,
                                   position.player, position.cells);
             position.seeds_player += scores_gain;
         } else {
             struct timeval start, end;
             gettimeofday(&start, NULL);
+
             position = computeComputerMove(position, maxDepth);
+
             // calculate last pos in the computermove
-            printf("I am now trying to capture for player 0 with start %d last pos %d\n", position.hole, position.last_pos);
-            printArray(position.cells, 12);
-            scores_gain = capture(position.hole, position.last_pos,
-                                  position.player, position.cells);
-            position.seeds_computer += scores_gain;
+            // printf("I am now trying to capture for player 0 with start %d last pos %d\n", position.hole, position.last_pos);
+            // printArray(position.cells, 12);
+            // scores_gain = capture(position.hole, position.last_pos,
+            //                       position.player, position.cells);
+            // position.seeds_computer += scores_gain;
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
@@ -135,14 +141,7 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     nextMove = generateMoves(nodes, initial, maximisingPlayer, maxDepth, 0);
 
     printf("Number of nodes traversed: %d\n", sizeOfArray);
-    // FILE *f = fopen("output.txt", "w");
 
-    // for (int i = 0; i< sizeOfArray; i++) {
-    //     fprintf(f, "For node %d the player is %d the hole moved is %d, the parent is %d, evaluation %d, isvalid %d\n", i,
-    //         nodes[i].player, nodes[i].hole, nodes[i].parent_idx, nodes[i].evaluation, nodes[i].valid_move);
-    //     printArray(f, nodes[i].cells, 12);
-    // }
-    // fclose(f);
     nextMove.position.last_pos = nextMove.position.hole + org_cells[nextMove.position.hole];
     if (org_cells[nextMove.position.hole] > 11) {
         nextMove.position.last_pos += 1;
@@ -158,11 +157,14 @@ int evaluate(Pos position) {
 struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
                           int depth, int parent_idx) {
 
-    // printf("Called generateMoves with maximi %d, player %d, depth %d\n", maximisingPlayer, position.player, depth);
     if (depth == 0) {
         struct Move move;
         move.position = position;
-        move.score = position.evaluation;
+        int score = evaluate(position);
+        move.position.evaluation = score;
+        move.score = score;
+        printf("I am at leaf, parent %d, leaf scores: %d seedcomp %d seedplayer %d\n", parent_idx/6, move.score, move.position.seeds_computer, move.position.seeds_player);
+        printArray(position.cells, 12);
         return move;
     }
 
@@ -186,12 +188,13 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
 
         // check for valid move
         if (cells[start_index] > 0) {
+            int looped = (cells[start_index] > 11) ? 1 : 0;
             int last_pos = start_index + cells[start_index];
 
             int * newMove = move(start_index, position.player, cells);
             memcpy(newPos.cells, newMove, sizeof(int) * 12);
 
-            int scores_gain = capture(start_index, last_pos, position.player, cells);
+            int scores_gain = capture(start_index, last_pos, looped, maximisingPlayer? 0 : 1, newPos.cells);
             if (maximisingPlayer) {
                 newPos.seeds_computer = position.seeds_computer + scores_gain;
                 newPos.seeds_player = position.seeds_player;
@@ -200,7 +203,8 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
                 newPos.seeds_computer = position.seeds_computer;
             }
             newPos.valid_move = 1;
-            newPos.evaluation = evaluate(newPos);
+            newPos.last_pos = last_pos;
+            // newPos.evaluation = evaluate(newPos);
         } else {
             newPos.valid_move = 0;
         }
@@ -210,6 +214,7 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
         newPos.player = (maximisingPlayer == true) ? 0 : 1;
         // if it is not valid just store the intialized pos with nothing, might want to reconsider this
         possib_moves[idx] = newPos;
+
         idx++;
         start_index++;
     }
@@ -311,7 +316,7 @@ int * move(int pos, int player, int * cells) {
     return cellsc;
 }
 
-int capture(int org_pos, int last_pos, int player, int * cells) {
+int capture(int org_pos, int last_pos, int looped, int player, int * cells) {
     // take note of edge case when it loops the entire round
     // check based on last pos backwards to see if can capture
     // can we only seeds on our side?! yes if the last position is on
@@ -319,13 +324,15 @@ int capture(int org_pos, int last_pos, int player, int * cells) {
     int scores = 0;
     int first_index = (player == 0) ? 6 : 0;
     int last_index = (player == 0) ? 11 : 5;
-    last_pos = (last_pos > last_index || last_pos < first_index) ? last_index : last_pos;
+    if (looped == 1) {
+        last_pos = last_index;
+    }
 
     for (int i = last_pos; i > org_pos && i >= first_index; i--) {
-        int idx = i % 12;
-        if (idx >= first_index && cells[idx] >= 2 && cells[idx] <= 3) {
-            scores += cells[idx];
-            cells[idx] = 0;
+        // int idx = i % 12;
+        if (i >= first_index && cells[i] >= 2 && cells[i] <= 3) {
+            scores += cells[i];
+            cells[i] = 0;
         } else {
             break;
         }
