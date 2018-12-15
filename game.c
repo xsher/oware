@@ -149,8 +149,6 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     }
     printf("Score for the move: %d\n", nextMove.score);
 
-    printf("NODE 25\n");
-    printArray(nodes[25].cells, 12);
     return nextMove.position;
 }
 
@@ -187,7 +185,7 @@ Pos generatePosition(Pos position, int hole, int * cells, bool maximisingPlayer,
 
     newPos.parent_idx = parent_idx;
     newPos.hole = hole;
-    newPos.player = (maximisingPlayer == true) ? 0 : 1;
+    newPos.player = maximisingPlayer ? 0 : 1;
 
     return newPos;
 }
@@ -200,21 +198,25 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
         int score = evaluate(position);
         move.position.evaluation = score;
         move.score = score;
-        printf("I am at leaf, parent %d, leaf scores: %d seedcomp %d seedplayer %d\n", parent_idx/6, move.score, move.position.seeds_computer, move.position.seeds_player);
+        printf("I am at leaf, player %d parent %d, leaf scores: %d seedcomp %d seedplayer %d      ", move.position.player, parent_idx/6, move.score, move.position.seeds_computer, move.position.seeds_player);
         printArray(move.position.cells, 12);
         return move;
     }
 
     Pos possib_moves[6];
     int idx = 0;
+    int newDepth = depth - 1;
+    struct Move bestMove;
+
+    // generating evaluation
+    struct Move childPos;
+    // for all moves generated at depth N
+    int first_valid = 0;
+    int index = (parent_idx * 6) + 1;
 
     // to prevent updates on original cell
     int * cells = (int*)malloc(sizeof(int)*12);
     memcpy(cells, position.cells, sizeof(int)*12);
-
-    // start of generation of children nodes
-    // for each position we have 6 possible moves for each player
-    // we will now determine which moves are valid and store it in the array
 
     int start_index = maximisingPlayer ? 0 : 6;
     int final_index = maximisingPlayer ? 5 : 11;
@@ -222,61 +224,38 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
     while (start_index <= final_index) {
 
         Pos newPos;
+        printf("\n");
         newPos = generatePosition(position, start_index, cells, maximisingPlayer, parent_idx);
-        // if it is not valid just store the intialized pos with nothing, might want to reconsider this
+        if (newPos.valid_move == 1) {
+            bool toMax = maximisingPlayer ? false : true;
+            childPos = generateMoves(nodes, newPos, toMax, newDepth, index + idx);
+            // for every children generated, if it is a valid move, and the player is computer, we will get max evaluation
+            // if the player is "player" we will get the min evaluation
+
+            printf("CHILD POS, hole %d score %d parent_idx %d isvalid %d myidx %d  last_pos %d player %d     ", childPos.position.hole, childPos.position.evaluation, childPos.position.parent_idx, childPos.position.valid_move,
+                    index + idx, childPos.position.last_pos, childPos.position.player);
+            printArray(childPos.position.cells, 12);
+
+            if (childPos.position.valid_move == 1) {
+                if ((maximisingPlayer && childPos.score > bestMove.score) ||
+                        (!maximisingPlayer && childPos.score < bestMove.score) || first_valid == 0) {
+                    bestMove.score = childPos.score;
+                    bestMove.position = (childPos.position.parent_idx > 0) ?
+                                    newPos : childPos.position;
+                    first_valid = 1;
+                }
+            }
+        }
         possib_moves[idx] = newPos;
 
         idx++;
         start_index++;
     }
 
-    int index = (parent_idx * 6) + 1;
     memcpy(&nodes[index], &possib_moves[0], sizeof(Pos)*6);
     // end of generation of children nodes and saving them into the nodes array
-
-    // if player == 0 i.e. the computer we are maximising
-    // if player == 1 i.e. the player we are minimizing
-    int newDepth = depth - 1;
-    struct Move bestMove;
-    // bestMove.score = (position.player == 0) ? -99999999 : 99999999;
-    // should be initialized to the first valid move at the very least.
-    // Come up with the metrics for determining this.
-    // for (int i = 0; i < 6; i++) {
-    //     if (possib_moves[i].valid_move == 1) {
-    //         bestMove.position = possib_moves[i];
-    //         bestMove.score = possib_moves[i].evaluation;
-    //         break;
-    //     }
-    // }
-    // printf("initialized best move at depth %d, parent_idx %d, position %d, score %d\n", depth, parent_idx, bestMove.position.hole, bestMove.score);
-
-    // generating evaluation
-    struct Move childPos;
-    // for all moves generated at depth N
-    int first_valid = 0;
-    for (int i = 0; i < 6; i++) {
-        // we check if the move is valid
-        if (possib_moves[i].valid_move == 1) {
-            // we generate child nodes for moves that are valid and reverse the role of maximisation
-            // if max is true now, set it to false next
-            bool toMax = maximisingPlayer ? false : true;
-            childPos = generateMoves(nodes, possib_moves[i],
-                        toMax, newDepth, index + i);
-            // for every children generated, if it is a valid move, and the player is computer, we will get max evaluation
-            // if the player is "player" we will get the min evaluation
-            if (childPos.position.valid_move == 1) {
-                if ((childPos.position.player == 0 && childPos.score > bestMove.score) ||
-                        (childPos.position.player == 1 && childPos.score < bestMove.score) || first_valid == 0) {
-                    bestMove.score = childPos.score;
-                    bestMove.position = (childPos.position.parent_idx > 0) ?
-                                    nodes[childPos.position.parent_idx] : childPos.position;
-                    first_valid = 1;
-                }
-            }
-        }
-    }
-    printf("Returned on maximising is %d, player %d parent %d\n", maximisingPlayer, bestMove.position.player, bestMove.position.parent_idx);
-    printf("the bset move player is %d, depth %d with score %d\n", bestMove.position.hole, depth, bestMove.score);
+    printf("Returned on maximising is %d, player %d parent %d    ", maximisingPlayer, bestMove.position.player, bestMove.position.parent_idx);
+    printf("the bset move is %d, depth %d with score %d\n", bestMove.position.hole, depth, bestMove.score);
     return bestMove;
 }
 
@@ -342,11 +321,16 @@ int capture(int org_pos, int last_pos, int looped, int player, int * cells) {
         last_pos = last_index;
     }
 
-    for (int i = last_pos; i > org_pos && i >= first_index; i--) {
+    printf("Player %d orgpos %d lastpos %d looped %d  start %d  last_index %d              ",player, org_pos, last_pos, looped, first_index, last_index);
+    printArray(cells, 12);
+    for (int i = last_pos; i > org_pos && i >= first_index && i <= last_index; i--) {
         // int idx = i % 12;
         if (i >= first_index && cells[i] >= 2 && cells[i] <= 3) {
+            printf("   i capt  %d    ", i);
+
             scores += cells[i];
             cells[i] = 0;
+            printArray(cells, 12);
         } else {
             break;
         }
