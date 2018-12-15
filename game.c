@@ -147,6 +147,9 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
         nextMove.position.last_pos += 1;
     }
     printf("Score for the move: %d\n", nextMove.score);
+
+    printf("NODE 25\n");
+    printArray(nodes[25].cells, 12);
     return nextMove.position;
 }
 
@@ -230,17 +233,19 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
     // bestMove.score = (position.player == 0) ? -99999999 : 99999999;
     // should be initialized to the first valid move at the very least.
     // Come up with the metrics for determining this.
-    for (int i = 0; i < 6; i++) {
-        if (possib_moves[i].valid_move == 1) {
-            bestMove.position = possib_moves[i];
-            bestMove.score = possib_moves[i].evaluation;
-            break;
-        }
-    }
+    // for (int i = 0; i < 6; i++) {
+    //     if (possib_moves[i].valid_move == 1) {
+    //         bestMove.position = possib_moves[i];
+    //         bestMove.score = possib_moves[i].evaluation;
+    //         break;
+    //     }
+    // }
+    // printf("initialized best move at depth %d, parent_idx %d, position %d, score %d\n", depth, parent_idx, bestMove.position.hole, bestMove.score);
 
     // generating evaluation
     struct Move childPos;
     // for all moves generated at depth N
+    int first_valid = 0;
     for (int i = 0; i < 6; i++) {
         // we check if the move is valid
         if (possib_moves[i].valid_move == 1) {
@@ -253,16 +258,17 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
             // if the player is "player" we will get the min evaluation
             if (childPos.position.valid_move == 1) {
                 if ((childPos.position.player == 0 && childPos.score > bestMove.score) ||
-                        (childPos.position.player == 1 && childPos.score < bestMove.score)) {
+                        (childPos.position.player == 1 && childPos.score < bestMove.score) || first_valid == 0) {
                     bestMove.score = childPos.score;
                     bestMove.position = (childPos.position.parent_idx > 0) ?
                                     nodes[childPos.position.parent_idx] : childPos.position;
+                    first_valid = 1;
                 }
             }
         }
     }
-    // printf("Returned on maximising is %d, player %d\n", maximisingPlayer, childPos.position.player);
-    // printf("the bset move player is %d, depth %d\n", bestMove.position.player, depth);
+    printf("Returned on maximising is %d, player %d parent %d\n", maximisingPlayer, bestMove.position.player, bestMove.position.parent_idx);
+    printf("the bset move player is %d, depth %d with score %d\n", bestMove.position.hole, depth, bestMove.score);
     return bestMove;
 }
 
