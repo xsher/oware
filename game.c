@@ -30,6 +30,7 @@ int capture(int org_pos, int last_pos, int looped, int player, int * cells);
 struct Move generateMoves(Pos* nodes, Pos position, bool maximisingPlayer,
     int depth, int parent_idx);
 Pos computeComputerMove(Pos initial, int maxDepth);
+Pos generatePosition(Pos position, int hole, int * cells, bool maximisingPlayer, int parent_idx);
 int evaluate(Pos position);
 
 void printArray(int * cells, int size) {
@@ -157,6 +158,39 @@ int evaluate(Pos position) {
     return position.seeds_computer - position.seeds_player;
 }
 
+Pos generatePosition(Pos position, int hole, int * cells, bool maximisingPlayer, int parent_idx) {
+
+    Pos newPos;
+
+    // check for valid move
+    if (cells[hole] > 0) {
+        int looped = (cells[hole] > 11) ? 1 : 0;
+        int last_pos = hole + cells[hole];
+
+        int * newMove = move(hole, position.player, cells);
+        memcpy(newPos.cells, newMove, sizeof(int) * 12);
+
+        int scores_gain = capture(hole, last_pos, looped, maximisingPlayer? 0 : 1, newPos.cells);
+        if (maximisingPlayer) {
+            newPos.seeds_computer = position.seeds_computer + scores_gain;
+            newPos.seeds_player = position.seeds_player;
+        } else {
+            newPos.seeds_player = position.seeds_player + scores_gain;
+            newPos.seeds_computer = position.seeds_computer;
+        }
+        newPos.valid_move = 1;
+        newPos.last_pos = last_pos;
+        // newPos.evaluation = evaluate(newPos);
+    } else {
+        newPos.valid_move = 0;
+    }
+
+    newPos.parent_idx = parent_idx;
+    newPos.hole = hole;
+    newPos.player = (maximisingPlayer == true) ? 0 : 1;
+
+    return newPos;
+}
 struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
                           int depth, int parent_idx) {
 
@@ -167,7 +201,7 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
         move.position.evaluation = score;
         move.score = score;
         printf("I am at leaf, parent %d, leaf scores: %d seedcomp %d seedplayer %d\n", parent_idx/6, move.score, move.position.seeds_computer, move.position.seeds_player);
-        printArray(position.cells, 12);
+        printArray(move.position.cells, 12);
         return move;
     }
 
@@ -188,33 +222,7 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
     while (start_index <= final_index) {
 
         Pos newPos;
-
-        // check for valid move
-        if (cells[start_index] > 0) {
-            int looped = (cells[start_index] > 11) ? 1 : 0;
-            int last_pos = start_index + cells[start_index];
-
-            int * newMove = move(start_index, position.player, cells);
-            memcpy(newPos.cells, newMove, sizeof(int) * 12);
-
-            int scores_gain = capture(start_index, last_pos, looped, maximisingPlayer? 0 : 1, newPos.cells);
-            if (maximisingPlayer) {
-                newPos.seeds_computer = position.seeds_computer + scores_gain;
-                newPos.seeds_player = position.seeds_player;
-            } else {
-                newPos.seeds_player = position.seeds_player + scores_gain;
-                newPos.seeds_computer = position.seeds_computer;
-            }
-            newPos.valid_move = 1;
-            newPos.last_pos = last_pos;
-            // newPos.evaluation = evaluate(newPos);
-        } else {
-            newPos.valid_move = 0;
-        }
-
-        newPos.parent_idx = parent_idx;
-        newPos.hole = start_index;
-        newPos.player = (maximisingPlayer == true) ? 0 : 1;
+        newPos = generatePosition(position, start_index, cells, maximisingPlayer, parent_idx);
         // if it is not valid just store the intialized pos with nothing, might want to reconsider this
         possib_moves[idx] = newPos;
 
