@@ -85,6 +85,9 @@ int main(void) {
         if (position.player == 1) {
             position.hole = requestMove(position.player, position.cells);
             position.last_pos = position.hole + position.cells[position.hole];
+            if (position.cells[position.hole] > 11) {
+                position.last_pos += 1;
+            }
             memcpy(position.cells, move(position.hole, position.player,
                    position.cells), sizeof(int)*12);
             scores_gain = capture(position.hole, position.last_pos,
@@ -141,7 +144,10 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     // }
     // fclose(f);
     nextMove.position.last_pos = nextMove.position.hole + org_cells[nextMove.position.hole];
-    printf("Score for the move: %d\n", nextMove.score);
+    if (org_cells[nextMove.position.hole] > 11) {
+        nextMove.position.last_pos += 1;
+    }
+    printf("Score for the move: %d\n", nextMove.position.evaluation);
     return nextMove.position;
 }
 
@@ -243,7 +249,7 @@ struct Move generateMoves(Pos * nodes, Pos position, bool maximisingPlayer,
             if (childPos.position.valid_move == 1) {
                 if ((childPos.position.player == 0 && childPos.position.evaluation > bestMove.score) ||
                         (childPos.position.player == 1 && childPos.position.evaluation < bestMove.score)) {
-                    bestMove.score = childPos.position.evaluation;
+                    bestMove.score = (childPos.position.parent_idx > 0) ? childPos.position.evaluation : bestMove.score;
                     bestMove.position = (childPos.position.parent_idx > 0) ?
                                     nodes[childPos.position.parent_idx] : childPos.position;
                 }
