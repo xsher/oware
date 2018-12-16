@@ -17,7 +17,7 @@ typedef struct BoardCell Cell;
 
 struct MoveRequest {
     int hole;
-    char * colour;
+    char colour[2];
     int spos; // position for special seed
 };
 
@@ -43,7 +43,7 @@ struct Move {
 };
 
 void startGame(Pos position, int maxDepth);
-int * move(int pos, int player, int * cells);
+Cell * move(Hole move, int player, Cell * cells);
 struct MoveRequest requestMove(int player, Cell * cells);
 int capture(int org_pos, int last_pos, int looped, int player, int * cells);
 struct Move minimax(Pos* nodes, Pos position, bool maximisingPlayer,
@@ -146,8 +146,10 @@ void startGame(Pos position, int maxDepth) {
             position.last_pos = position.move.hole + position.cells[position.move.hole].total;
             if (looped) position.last_pos += 1;
 
-            // memcpy(position.cells, move(position.hole, position.player,
-            //        position.cells), sizeof(int)*12);
+            memcpy(position.cells, move(position.move, position.player,
+                   position.cells), sizeof(Cell)*12);
+            printf("Board after player 1 move");
+            printBoard(position.cells, position.seeds_computer, position.seeds_player);
             // scores_gain = capture(position.hole, position.last_pos, looped,
             //                       position.player, position.cells);
             // position.seeds_player += scores_gain;
@@ -411,9 +413,10 @@ struct MoveRequest requestMove(int player, Cell * cells) {
         } while(!(request.hole >= 6 && request.hole <= 11) || cells[request.hole].total == 0);
     }
 
-
-    printf("Which colour to start with? R or B?    ");
-    scanf("%s", &request.colour);
+    do {
+        printf("Which colour to start with? R or B?    ");
+        scanf("%1s", &request.colour);
+    } while(strcmp(request.colour, "R") != 0  && strcmp(request.colour, "B") != 0);
 
     do {
         printf("Which step to place the special seed? Max of %d steps.   ", cells[request.hole].total);
@@ -423,28 +426,44 @@ struct MoveRequest requestMove(int player, Cell * cells) {
     return request;
 }
 
-// int * move(int pos, int player, int * cells) {
-//     // skip original position- change it to while loop
-//     int * cellsc = (int*)malloc(sizeof(int)*12);
-//     memcpy(cellsc, cells, sizeof(int)*12);
+Cell * move(Hole move, int player, Cell * cells) {
+    // skip original position- change it to while loop
+    Cell * cellscpy = (Cell *)malloc(sizeof(Cell)*12);
+    memcpy(cellscpy, cells, sizeof(Cell)*12);
 
-//     int stones = cellsc[pos];
-//     cellsc[pos] = 0;
+    Cell stones = cellscpy[move.hole];
+    Cell empty = {0, 0 ,0};
+    cellscpy[move.hole] = empty;
 
-//     int i = 0;
-//     while (stones > 0) {
-//         int idx = (pos + i + 1) % 12;
-//         // moving the pos ahead
-//         i++;
+    int i = 0;
+    while (stones.total > 0) {
+        int idx = (move.hole + i + 1) % 12;
+        // moving the pos ahead
+        i++;
+        // skip original hole
+        if (idx == move.hole) continue;
+        if (i == move.spos && stones.special > 0) {
+            cellscpy[idx].special += 1;
+            stones.special--;
+        } else if (strcmp(move.colour, "R") == 0 && stones.red > 0) {
+            cellscpy[idx].red += 1;
+            stones.red--;
+        } else if (strcmp(move.colour, "B") == 0 && stones.black > 0) {
+            cellscpy[idx].black += 1;
+            stones.black--;
+        } else if (stones.black > 0) {
+            cellscpy[idx].black += 1;
+            stones.black--;
+        } else if (stones.red > 0) {
+            cellscpy[idx].red += 1;
+            stones.red--;
+        }
 
-//         // skip original hole
-//         if (idx == pos) continue;
-
-//         cellsc[idx] += 1;
-//         stones--;
-//     }
-//     return cellsc;
-// }
+        cellscpy[idx].total += 1;
+        stones.total--;
+    }
+    return cellscpy;
+}
 
 // int capture(int org_pos, int last_pos, int looped, int player, int * cells) {
 //     // take note of edge case when it loops the entire round
