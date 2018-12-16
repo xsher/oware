@@ -43,9 +43,9 @@ struct Move {
 };
 
 void startGame(Pos position, int maxDepth);
-Cell * move(Hole move, int player, Cell * cells);
+void move(Pos position);
 struct MoveRequest requestMove(int player, Cell * cells);
-int capture(int org_pos, int last_pos, int looped, int player, int * cells);
+int capture(Hole move, int last_pos, int looped, int player, Cell * cells);
 struct Move minimax(Pos* nodes, Pos position, bool maximisingPlayer,
     int depth, int parent_idx, int * count);
 Pos computeComputerMove(Pos initial, int maxDepth);
@@ -142,16 +142,14 @@ void startGame(Pos position, int maxDepth) {
             } 
 
             position.move = requestMove(position.player, position.cells);
-            int looped = (position.cells[position.move.hole].total > 11) ? 1 : 0;
-            position.last_pos = position.move.hole + position.cells[position.move.hole].total;
-            if (looped) position.last_pos += 1;
-
-            memcpy(position.cells, move(position.move, position.player,
-                   position.cells), sizeof(Cell)*12);
+            // memcpy(position.cells, move(position), sizeof(Cell)*12);
+            move(position);
             printf("Board after player 1 move");
             printBoard(position.cells, position.seeds_computer, position.seeds_player);
-            // scores_gain = capture(position.hole, position.last_pos, looped,
+            // scores_gain = capture(position.move, position.last_pos, looped,
             //                       position.player, position.cells);
+            // printf("Board after player 1 capture");
+            // printBoard(position.cells, position.seeds_computer, position.seeds_player);
             // position.seeds_player += scores_gain;
 
             // to remove after this line;
@@ -426,43 +424,135 @@ struct MoveRequest requestMove(int player, Cell * cells) {
     return request;
 }
 
-Cell * move(Hole move, int player, Cell * cells) {
+void move(Pos position) {
     // skip original position- change it to while loop
     Cell * cellscpy = (Cell *)malloc(sizeof(Cell)*12);
-    memcpy(cellscpy, cells, sizeof(Cell)*12);
+    memcpy(cellscpy, position.cells, sizeof(Cell)*12);
 
-    Cell stones = cellscpy[move.hole];
+    Cell stones = cellscpy[position.move.hole];
     Cell empty = {0, 0 ,0};
-    cellscpy[move.hole] = empty;
+    cellscpy[position.move.hole] = empty;
 
-    int i = 0;
-    while (stones.total > 0) {
-        int idx = (move.hole + i + 1) % 12;
-        // moving the pos ahead
-        i++;
-        // skip original hole
-        if (idx == move.hole) continue;
-        if (i == move.spos && stones.special > 0) {
-            cellscpy[idx].special += 1;
+
+    int scores_gain = 0;
+    bool capture = false; // determines if still fit the capture criteria
+    int looped = (position.cells[position.move.hole].total > 11) ? 1 : 0;
+    position.last_pos = position.move.hole + position.cells[position.move.hole].total;
+    if (looped) position.last_pos += 1;
+    int special_seed_pos = position.move.hole + position.move.spos;
+
+    int capt_index;
+    int first_index = (position.player == 0) ? 6 : 0;
+    int last_index = (position.player == 0) ? 11 : 5;
+    capt_index = (looped == 1) ? last_index : position.last_pos;
+
+    // breaks out when there is no stones left
+    for (int j = position.last_pos; ; j--) {
+        if (j == capt_index) capture = true;
+        if (j == position.move.hole) {
+            capture = false;
+            continue;
+        }
+
+        char seed_placed[2];
+
+        if (j == special_seed_pos & stones.special > 0) {
+            printf("increase S at %d\n", j);
+            cellscpy[j%12].special += 1;
+            strncpy(seed_placed, "S", 2);
             stones.special--;
-        } else if (strcmp(move.colour, "R") == 0 && stones.red > 0) {
-            cellscpy[idx].red += 1;
-            stones.red--;
-        } else if (strcmp(move.colour, "B") == 0 && stones.black > 0) {
-            cellscpy[idx].black += 1;
+        } else if (strcmp(position.move.colour, "R") == 0 && stones.black > 0) {
+            printf("increase B at %d\n", j);
+            cellscpy[j%12].black += 1;
+            strncpy(seed_placed, "B", 2);
             stones.black--;
+        } else if (strcmp(position.move.colour, "B") == 0 && stones.red > 0) {
+            printf("increase R at %d\n", j);
+            cellscpy[j%12].red += 1;
+            strncpy(seed_placed, "R", 2);
+            stones.red--;
         } else if (stones.black > 0) {
-            cellscpy[idx].black += 1;
+            printf("increase B at %d\n", j);
+            cellscpy[j%12].black += 1;
+            strncpy(seed_placed, "B", 2);
             stones.black--;
         } else if (stones.red > 0) {
-            cellscpy[idx].red += 1;
+            printf("increase R at %d\n", j);
+            cellscpy[j%12].red += 1;
+            strncpy(seed_placed, "R", 2);
             stones.red--;
         }
 
-        cellscpy[idx].total += 1;
+        cellscpy[j%12].total += 1;
         stones.total--;
+
+        if (capture) {
+            if (strcmp(seed_placed, "R") == 0 && cellscpy[j].red >= 2 && cellscpy[j].red <= 3) {
+                scores_gain += cellscpy[j].red;
+                cellscpy[j].red = 0;
+            } else if (strcmp(seed_placed, "B") == 0 && cellscpy[j].black >= 2 && cellscpy[j].black <= 3) {
+                scores_gain += cellscpy[j].black;
+                cellscpy[j].black = 0;
+            } else if (strcmp(seed_placed, "S") == 0) {
+                if (cellscpy[j].black >= 2 && cellscpy[j].black <= 3) {
+                    scores_gain += cellscpy[j].black;
+                    cellscpy[j].black = 0;
+                }
+                if (cellscpy[j].red >= 2 && cellscpy[j].red <= 3) {
+                    scores_gain += cellscpy[j].red;
+                    cellscpy[j].red = 0;
+                }
+            } else {
+                capture = false;
+            }
+        }
+        if (stones.total == 0) {
+            break;
+        }
     }
-    return cellscpy;
+
+    if (scores_gain > 0 && position.player == 0) {
+        position.seeds_computer += scores_gain;
+    } else if (scores_gain > 0 && position.player == 0) {
+        position.seeds_player += scores_gain;
+    }
+    // int i = 0;
+    // while (stones.total > 0) {
+    //     int idx = (move.hole + i + 1) % 12;
+    //     // moving the pos ahead
+    //     i++;
+    //     // skip original hole
+    //     if (idx == move.hole) {
+    //         seeds[i] = "N";
+    //         continue;
+    //     }
+    //     if (i == move.spos && stones.special > 0) {
+    //         cellscpy[idx].special += 1;
+    //         seeds[i] = "S";
+    //         stones.special--;
+    //     } else if (strcmp(move.colour, "R") == 0 && stones.red > 0) {
+    //         cellscpy[idx].red += 1;
+    //         seeds[i] = "R";
+    //         stones.red--;
+    //     } else if (strcmp(move.colour, "B") == 0 && stones.black > 0) {
+    //         cellscpy[idx].black += 1;
+    //         seeds[i] = "B";
+    //         stones.black--;
+    //     } else if (stones.black > 0) {
+    //         cellscpy[idx].black += 1;
+    //         seeds[i] = "B";
+    //         stones.black--;
+    //     } else if (stones.red > 0) {
+    //         cellscpy[idx].red += 1;
+    //         seeds[i] = "B";
+    //         stones.red--;
+    //     }
+
+    //     cellscpy[idx].total += 1;
+    //     stones.total--;
+    // }
+    // return cellscpy;
+    memcpy(position.cells, cellscpy, sizeof(Cell)*12);
 }
 
 // int capture(int org_pos, int last_pos, int looped, int player, int * cells) {
