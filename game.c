@@ -49,16 +49,10 @@ Move minimax(Pos position, bool maximisingPlayer,
     int depth, int parent_idx, int * count);
 Move minimaxAlphaBeta(Pos position, bool maximisingPlayer,
     int alpha, int beta, int depth, int parent_idx, int * count);
-Pos generatePosition(Pos position, int hole, int col, bool maximisingPlayer, int parent_idx);
+Pos generatePosition(Pos position, int hole, int col, int spos,
+    bool maximisingPlayer, int parent_idx);
 Pos computeComputerMove(Pos initial, int maxDepth);
 
-
-void printArray(int * cells, int size) {
-    for (int i = 0; i<size; i++) {
-        printf("%d  ", cells[i]);
-    }
-    printf("\n");
-}
 
 void printBoard(Cell * b, int seeds_computer, int seeds_player) {
     printf("\nComputer side\n");
@@ -175,7 +169,6 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     // the first move that is feeded is always the move that has been done by the player
     int counter = 0;
     nextMove = minimaxAlphaBeta(initial, maximisingPlayer, -76, 76, maxDepth, 0, &counter);
-    // nextMove = minimax(nodes, initial, maximisingPlayer, maxDepth, 0, &counter);
 
     printf("Number of nodes traversed: %d\n", counter);
     printf("Score for the move: %d\n", nextMove.score);
@@ -202,12 +195,13 @@ Pos copyPos(Pos p1) {
     return p2;
 }
 
-Pos generatePosition(Pos position, int hole, int col, bool maximisingPlayer, int parent_idx) {
+Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingPlayer, int parent_idx) {
     Pos newPos = copyPos(position);
 
     char colours[4] = "RBS";
 
     newPos.move.hole = hole;
+    newPos.move.spos = spos;
     memcpy(newPos.move.colour, &colours[col], sizeof(char));
 
     if (newPos.cells[hole].total > 0) {
@@ -231,14 +225,16 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
         Move move;
         move.score = evaluate(position);
         move.position = copyPos(position);
-        // printf("Score at hole %d colour %s leaf %d depth %d idx %d parent_idx %d\n",
-        //     position.move.hole,position.move.colour, move.score, depth, parent_idx, position.parent_idx);
+        move.leaf = copyPos(position);
         return move;
     }
 
     int idx = 0;
     int newDepth = depth - 1;
     Move bestMove;
+
+    Cell * original_cells = (Cell *) malloc (sizeof(Cell)*12);
+    memcpy(original_cells, position.cells, sizeof(Cell)*12);
 
     int first_valid = 0;
     int index = (parent_idx * 12) + 1;
@@ -248,114 +244,49 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
 
     for (int j = start_index; j <= final_index; j++) {   
         for (int i = 0; i < 3; i++) {
-            Pos newPos = generatePosition(position, j, i, maximisingPlayer, parent_idx);
-            newPos.current_idx = idx + index;
+            for (int l = 1; l <= original_cells[j].total; l++) {
 
-            if (newPos.valid_move == 1) {
+                Pos newPos = generatePosition(position, j, i, l, maximisingPlayer, parent_idx);
+                newPos.current_idx = idx + index;
 
-                Move childPos;
-                Pos feedPos = copyPos(newPos);
+                if (newPos.valid_move == 1) {
 
-                bool toMax = maximisingPlayer ? false : true;
-                childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, index + idx, counter);
+                    Move childPos;
+                    Pos feedPos = copyPos(newPos);
 
-                if (first_valid == 0) {
-                    // initialization of value if not given
-                    bestMove.score = childPos.score;
-                    bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
-                    bestMove.leaf = (newDepth == 0) ? copyPos(childPos.position) : childPos.leaf;
-                    first_valid = 1;
-                    // printf("initialized score to maximise %d current_idx %d childposidx %d score %d depth %d\n",
-                    //     maximisingPlayer, newPos.parent_idx, childPos.idx, bestMove.score, depth);
+                    bool toMax = maximisingPlayer ? false : true;
+                    childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, index + idx, counter);
 
-                } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
-                        (!maximisingPlayer && childPos.score < bestMove.score)) {
-                    bestMove.score = childPos.score;
-                    bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
-                    if (newDepth == 0 ) bestMove.leaf = copyPos(childPos.position);
+                    if (first_valid == 0) {
+                        // initialization of value if not given
+                        bestMove.score = childPos.score;
+                        bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
+                        bestMove.leaf = (newDepth == 0) ? copyPos(childPos.position) : childPos.leaf;
+                        first_valid = 1;
 
-                    // printf("Better score! Updated score to maximise %d current_idx %d childposidx %d score %d depth %d\n",
-                    //     maximisingPlayer, newPos.parent_idx, childPos.idx, bestMove.score, depth);
-                    if (maximisingPlayer && bestMove.score > alpha) {
-                        alpha = bestMove.score;
-                    } else if (!maximisingPlayer && bestMove.score < beta) {
-                        beta = bestMove.score;
+                    } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
+                            (!maximisingPlayer && childPos.score < bestMove.score)) {
+                        bestMove.score = childPos.score;
+                        bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
+                        if (newDepth == 0 ) bestMove.leaf = copyPos(childPos.position);
+
+                        if (maximisingPlayer && bestMove.score > alpha) {
+                            alpha = bestMove.score;
+                        } else if (!maximisingPlayer && bestMove.score < beta) {
+                            beta = bestMove.score;
+                        }
                     }
                 }
+                if (beta <= alpha) {
+                    break;
+                }
+                idx++;
             }
-            if (beta <= alpha) {
-                // printf("Pruning\n");
-                break;
-            }
-            idx++;
         }
     }
 
-    // printf("Returned best move for maximising %d at depth %d parent %d score %d\n", maximisingPlayer, depth, parent_idx, bestMove.score);
     return bestMove;
 }
-
-// Move minimax(Pos position, bool maximisingPlayer, int depth, int parent_idx, int * count) {
-//     *count += 1;
-//     int * counter = count;
-//     if (depth == 0) {
-//         Move move;
-//         move.idx = parent_idx;
-//         move.score = evaluate(position);
-//         return move;
-//     }
-
-//     int idx = 0;
-//     int newDepth = depth - 1;
-//     Move bestMove;
-
-//     int first_valid = 0;
-//     int index = (parent_idx * 6) + 1;
-
-//     // to prevent updates on original cell
-//     Cell * cells = (Cell *)malloc(sizeof(Cell)*12);
-//     memcpy(cells, position.cells, sizeof(Cell)*12);
-
-//     int start_index = maximisingPlayer ? 0 : 6;
-//     int final_index = maximisingPlayer ? 5 : 11;
-
-//     while (start_index <= final_index) {
-//         Pos newPos = generatePosition(position, start_index, maximisingPlayer, parent_idx);
-//         newPos.current_idx = idx + index;
-
-//         if (newPos.valid_move == 1) {
-
-//             Move childPos;
-//             Pos feedPos = copyPos(newPos);
-
-//             bool toMax = maximisingPlayer ? false : true;
-//             childPos = minimax(feedPos, toMax, newDepth, index + idx, counter);
-
-//             if (first_valid == 0) {
-//                 // initialization of value if not given
-//                 bestMove.score = childPos.score;
-//                 bestMove.idx = (newPos.current_idx == 0) ? childPos.idx : newPos.current_idx;
-//                 first_valid = 1;
-//                 // printf("initialized score to maximise %d current_idx %d childposidx %d score %d",
-//                 //     maximisingPlayer, newPos.current_idx, childPos.idx, bestMove.score);
-//             } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
-//                     (!maximisingPlayer && childPos.score < bestMove.score)) {
-
-//                 bestMove.score = childPos.score;
-//                 bestMove.idx = (newPos.current_idx == 0) ? childPos.idx : newPos.current_idx;
-//                 // printf("Better score! Updated score to maximise %d current_idx %d childposidx %d score %d",
-//                 //     maximisingPlayer, newPos.current_idx, childPos.idx, bestMove.score);
-
-//             }
-//         }
-
-//         idx++;
-//         start_index++;
-//     }
-
-//     // printf("Returned best move for maximising %d at depth %d parent %d score %d\n", maximisingPlayer, depth, parent_idx, bestMove.score);
-//     return bestMove;
-// }
 
 Hole requestMove(int player, Cell * cells) {
     Hole request;
@@ -487,21 +418,11 @@ Pos move(Pos position) {
             break;
         }
     }
-    // printf("newpos player %d capt_idx %d start_index %d last_index %d scores %d\n",
-    //         newPos.player, capt_index, first_index, last_index, scores_gain);
     if (scores_gain > 0 && newPos.player == 1) {
-        // printf("computer gained: %d\n", scores_gain);
-        // printf("on position hole %d parent_idx %d current_idx %d score gained after move %d\n",
-        //     position.move.hole, position.parent_idx, position.current_idx, scores_gain);
         newPos.seeds_computer += scores_gain;
     } else if (scores_gain > 0 && newPos.player == 0) {
-        // printf("player gained: %d\n", scores_gain);
-        // printf("on position hole %d parent_idx %d current_idx %d score gained after move %d\n",
-        //     position.move.hole, position.parent_idx, position.current_idx, scores_gain);
         newPos.seeds_player += scores_gain;
     }
-    // printf("on position hole %d parent_idx %d current_idx %d score gained after move %d seedcomp %d seedplayer %d\n",
-    //         position.move.hole, position.parent_idx, position.current_idx, scores_gain, newPos.seeds_computer, newPos.seeds_player);
 
     memcpy(newPos.cells, cellscpy, sizeof(Cell)*12);
     return newPos;
