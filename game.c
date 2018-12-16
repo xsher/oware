@@ -125,11 +125,9 @@ void startGame(Pos position, int maxDepth) {
     bool first_p = true;  // used to indicate initialization of special seed
     bool first_c = true;
 
-    int over = 0;
     // while it is not game over yet
-    // while (position.seeds_computer <= maxSeeds/2 ||
-    //         position.seeds_player <= maxSeeds/2) {
-    while (over < 5) {
+    while (position.seeds_computer <= maxSeeds/2 ||
+            position.seeds_player <= maxSeeds/2) {
         printf("\nPlayer %d turn\n", position.player);
 
         if (position.player == 1) {
@@ -157,7 +155,6 @@ void startGame(Pos position, int maxDepth) {
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
-        over++; //to remove
         printf("Current board status:\n");
         printBoard(position.cells, position.seeds_computer, position.seeds_player);
         position.player = (position.player == 1) ? 0 : 1;
@@ -180,17 +177,11 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
 
     // the first move that is feeded is always the move that has been done by the player
     int counter = 0;
-    // nextMove = minimax(nodes, initial, maximisingPlayer, maxDepth, 0, &counter);
     nextMove = minimaxAlphaBeta(nodes, initial, maximisingPlayer, -76, 76, maxDepth, 0, &counter);
+    // nextMove = minimax(nodes, initial, maximisingPlayer, maxDepth, 0, &counter);
 
     printf("Number of nodes traversed: %d\n", counter);
-
-    // nextMove.position.last_pos = nextMove.position.move.hole + org_cells[nextMove.position.move.hole];
-    // if (org_cells[nextMove.position.hole] > 11) {
-    //     nextMove.position.last_pos += 1;
-    // }
     printf("Score for the move: %d\n", nextMove.score);
-    // printBoard(f, nodes[nextMove.idx].cells, nodes[nextMove.idx].seeds_computer, nodes[nextMove.idx].seeds_player);
     printf("Next move is on idx %d\n", nextMove.idx);
     return nodes[nextMove.idx];
 }
@@ -201,47 +192,33 @@ int evaluate(Pos position) {
 
 Pos copyPos(Pos p1) {
     Pos p2;
-    printf("Inside copypos\n");
-    printBoard(p1.cells, p1.seeds_computer, p1.seeds_player);
 
     p2.cells = (Cell *) malloc(sizeof(Cell)*12);
     memcpy(p2.cells, p1.cells, sizeof(Cell)*12);
-    printf("1  ");
+
     p2.player = p1.player;                 // 0 if the computer's play and 1 otherwise
-    printf("2  ");
     p2.seeds_player = p1.seeds_player;     // seeds taken by the player
-    printf("3  ");
     p2.seeds_computer = p1.seeds_computer; // seeds taken by the computer
-    printf("4  ");
     p2.parent_idx = p1.parent_idx;         // position's index in the array
-    printf("5  ");
     p2.valid_move = p1.valid_move;         // 0 if not valid
-    printf("6  ");
+    p2.current_idx = p1.current_idx;
     p2.move = p1.move;                     // which hole was chosen
-    printf("7\n");
-
-    printBoard(p2.cells, p2.seeds_computer, p2.seeds_player);
-
     return p2;
 }
 
 Pos generatePosition(Pos position, int hole, bool maximisingPlayer, int parent_idx) {
-    printf("is it here ");
     Pos newPos = copyPos(position);
-    printf("copy pos, newPos  ");
-    printBoard(newPos.cells, newPos.seeds_computer, newPos.seeds_player);
 
     newPos.move.hole = hole;
-    printf("HERE inside generatePos  ");
     if (newPos.cells[hole].total > 0) {
         newPos = move(newPos);
         newPos.valid_move = 1;
     } else {
         newPos.valid_move = 0;
     }
-    printf("INSIDE generatePosition\n");
-    newPos.player = maximisingPlayer ? 0 : 1;
+    newPos.player = (position.player == 1) ? 0 : 1;
     newPos.evaluation = evaluate(position);
+    newPos.parent_idx = parent_idx;
 
     return newPos;
 }
@@ -254,8 +231,6 @@ Move minimaxAlphaBeta(Pos * nodes, Pos position, bool maximisingPlayer, int alph
         Move move;
         move.idx = parent_idx;
         move.score = evaluate(position);
-        printf("I am at leaf, returning Move as it is for depth %d my idx %d, parent_id %d has score of %d\n",
-            depth, parent_idx, move.score);
         return move;
     }
 
@@ -278,9 +253,6 @@ Move minimaxAlphaBeta(Pos * nodes, Pos position, bool maximisingPlayer, int alph
     while (start_index <= final_index) {   
  
         Pos newPos = generatePosition(position, start_index, maximisingPlayer, parent_idx);
-        printf("GENERATING POSITIOn MOVES\n");
-        printBoard(newPos.cells, newPos.seeds_computer, newPos.seeds_player);
-
         newPos.current_idx = idx + index;
 
         if (newPos.valid_move == 1) {
@@ -288,14 +260,10 @@ Move minimaxAlphaBeta(Pos * nodes, Pos position, bool maximisingPlayer, int alph
             possib_moves[idx] = newPos;
 
             Move childPos;
-            printf("generatin feedPos\n");
             Pos feedPos = copyPos(newPos);
-            printf("generated feedPos\n");
 
             bool toMax = maximisingPlayer ? false : true;
-            printf("generatin childPos\n");
             childPos = minimaxAlphaBeta(nodes, feedPos, toMax, alpha, beta, newDepth, index + idx, counter);
-            printf("generated childPos\n");
 
             if (first_valid == 0) {
                 // initialization of value if not given
@@ -315,79 +283,81 @@ Move minimaxAlphaBeta(Pos * nodes, Pos position, bool maximisingPlayer, int alph
             }
         }
 
-        if (beta <= alpha) break;
+        if (beta <= alpha) {
+            printf("Pruning\n");
+            break;
+        }
         idx++;
         start_index++;
     }
 
     memcpy(&nodes[index], &possib_moves[0], sizeof(Pos)*6);
-    printf("Returned best move for maximising %d at depth %d parent %d\n", maximisingPlayer, depth, parent_idx);
-    // printBoard(f, bestMove.position.cells, bestMove.position.seeds_computer, bestMove.position.seeds_player);
-    // end of generation of children nodes and saving them into the nodes array
     return bestMove;
 }
 
+Move minimax(Pos * nodes, Pos position, bool maximisingPlayer, int depth, int parent_idx, int * count) {
+    *count += 1;
+    int * counter = count;
+    if (depth == 0) {
+        Move move;
+        move.idx = parent_idx;
+        move.score = evaluate(position);
+        return move;
+    }
 
-//Move minimax(Pos * nodes, Pos position, bool maximisingPlayer,
-//                           int depth, int parent_idx, int * count) {
-//     *count += 1;
-//     int * counter = count;
+    Pos * possib_moves = (Pos *) malloc (sizeof(Pos)* 6);
 
-//     if (depth == 0) {
-//         struct Move move;
-//         move.position = position;
-//         int score = evaluate(position);
-//         move.position.evaluation = score;
-//         move.score = score;
-//         return move;
-//     }
+    int idx = 0;
+    int newDepth = depth - 1;
+    Move bestMove;
 
-//     Pos possib_moves[6];
-//     int idx = 0;
-//     int newDepth = depth - 1;
-//     struct Move bestMove;
+    int first_valid = 0;
+    int index = (parent_idx * 6) + 1;
 
-//     // generating evaluation
-//     struct Move childPos;
-//     // for all moves generated at depth N
-//     int first_valid = 0;
-//     int index = (parent_idx * 6) + 1;
+    // to prevent updates on original cell
+    Cell * cells = (Cell *)malloc(sizeof(Cell)*12);
+    memcpy(cells, position.cells, sizeof(Cell)*12);
 
-//     // to prevent updates on original cell
-//     int * cells = (int*)malloc(sizeof(int)*12);
-//     memcpy(cells, position.cells, sizeof(int)*12);
+    int start_index = maximisingPlayer ? 0 : 6;
+    int final_index = maximisingPlayer ? 5 : 11;
 
-//     int start_index = maximisingPlayer ? 0 : 6;
-//     int final_index = maximisingPlayer ? 5 : 11;
+    while (start_index <= final_index) {
+        Pos newPos = generatePosition(position, start_index, maximisingPlayer, parent_idx);
+        newPos.current_idx = idx + index;
 
-//     while (start_index <= final_index) {
+        if (newPos.valid_move == 1) {
+            // check if need to copy
+            possib_moves[idx] = newPos;
 
-//         Pos newPos;
-//         newPos = generatePosition(position, start_index, cells, maximisingPlayer, parent_idx);
-//         if (newPos.valid_move == 1) {
-//             bool toMax = maximisingPlayer ? false : true;
-//             childPos = minimax(nodes, newPos, toMax, newDepth, index + idx, counter);
+            Move childPos;
+            Pos feedPos = copyPos(newPos);
 
-//            if (childPos.position.valid_move == 1) {
-//                 if ((maximisingPlayer && childPos.score > bestMove.score) ||
-//                         (!maximisingPlayer && childPos.score < bestMove.score) || first_valid == 0) {
-//                     bestMove.score = childPos.score;
-//                     bestMove.position = (childPos.position.parent_idx > 0) ?
-//                                     newPos : childPos.position;
-//                     first_valid = 1;
-//                 }
-//             }
-//         }
-//         possib_moves[idx] = newPos;
+            bool toMax = maximisingPlayer ? false : true;
+            childPos = minimax(nodes, feedPos, toMax, newDepth, index + idx, counter);
 
-//         idx++;
-//         start_index++;
-//     }
+            if (first_valid == 0) {
+                // initialization of value if not given
+                bestMove.score = childPos.score;
+                bestMove.idx = (newPos.current_idx == 0) ? childPos.idx : newPos.current_idx;
+                first_valid = 1;
+            } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
+                    (!maximisingPlayer && childPos.score < bestMove.score)) {
 
-//     memcpy(&nodes[index], &possib_moves[0], sizeof(Pos)*6);
-//     // end of generation of children nodes and saving them into the nodes array
-//     return bestMove;
-// }
+                bestMove.score = childPos.score;
+                bestMove.idx = (newPos.current_idx == 0) ? childPos.idx : newPos.current_idx;
+
+
+            }
+        }
+
+        idx++;
+        start_index++;
+    }
+
+    memcpy(&nodes[index], &possib_moves[0], sizeof(Pos)*6);
+    // printf("Returned best move for maximising %d at depth %d parent %d score %d\n", maximisingPlayer, depth, parent_idx, bestMove.score);
+    return bestMove;
+}
 
 Hole requestMove(int player, Cell * cells) {
     Hole request;
@@ -429,14 +399,8 @@ Pos move(Pos position) {
     Pos newPos;
     newPos = copyPos(position);
 
-    printf("IN MOVE\n");
-    printBoard(position.cells, position.seeds_computer, position.seeds_player);
-    // printBoard(newPos.cells, newPos.seeds_computer, newPos.seeds_player);
-
     Cell * cellscpy = (Cell *)malloc(sizeof(Cell)*12);
     memcpy(cellscpy, position.cells, sizeof(Cell)*12);
-    printBoard(cellscpy, newPos.seeds_computer, newPos.seeds_player);
-
 
     Cell stones = cellscpy[newPos.move.hole];
     Cell empty = {0, 0 ,0};
@@ -450,8 +414,8 @@ Pos move(Pos position) {
     int special_seed_pos = newPos.move.hole + newPos.move.spos;
 
     int capt_index;
-    int first_index = (newPos.player == 0) ? 6 : 0;
-    int last_index = (newPos.player == 0) ? 11 : 5;
+    int first_index = (newPos.player == 1) ? 6 : 0;
+    int last_index = (newPos.player == 1) ? 11 : 5;
     capt_index = (looped == 1) ? last_index : newPos.last_pos;
 
     // breaks out when there is no stones left
@@ -465,31 +429,22 @@ Pos move(Pos position) {
         char seed_placed[2];
 
         if (j == special_seed_pos & stones.special > 0) {
-            // fprintf(f, "increase S at %d    ", j);    
             cellscpy[j%12].special += 1;
             strncpy(seed_placed, "S", 2);
             stones.special--;
         } else if (strcmp(newPos.move.colour, "R") == 0 && stones.black > 0) {
-            // fprintf(f, "increase B at %d    ", j);    
-            // printf("increase B at %d\n", j);
             cellscpy[j%12].black += 1;
             strncpy(seed_placed, "B", 2);
             stones.black--;
         } else if (strcmp(newPos.move.colour, "B") == 0 && stones.red > 0) {
-            // fprintf(f, "increase R at %d    ", j);    
-            // printf("increase R at %d\n", j);
             cellscpy[j%12].red += 1;
             strncpy(seed_placed, "R", 2);
             stones.red--;
         } else if (stones.black > 0) {
-            // fprintf(f, "increase B at %d    ", j);    
-            // printf("increase B at %d\n", j);
             cellscpy[j%12].black += 1;
             strncpy(seed_placed, "B", 2);
             stones.black--;
         } else if (stones.red > 0) {
-            // fprintf(f, "increase R at %d    ", j);    
-            // printf("increase R at %d\n", j);
             cellscpy[j%12].red += 1;
             strncpy(seed_placed, "R", 2);
             stones.red--;
@@ -497,77 +452,53 @@ Pos move(Pos position) {
 
         cellscpy[j%12].total += 1;
         stones.total--;
-        // fprintf(f, "Total stones now : %d\n", stones.total);
 
-        // remove from total!
-        if (capture) {
-            // fprintf(f, "Still can capture\n");
+        if (capture && j>= first_index && j <= last_index) {
             if (strcmp(seed_placed, "R") == 0 && cellscpy[j].red >= 2 && cellscpy[j].red <= 3) {
-                // fprintf(f, "Capturing red cells %d\n", cellscpy[j].red);
                 scores_gain += cellscpy[j].red;
+                cellscpy[j].total -= cellscpy[j].red;
                 cellscpy[j].red = 0;
             } else if (strcmp(seed_placed, "B") == 0 && cellscpy[j].black >= 2 && cellscpy[j].black <= 3) {
-                // fprintf(f, "Capturing black cells %d\n", cellscpy[j].black);
                 scores_gain += cellscpy[j].black;
+                cellscpy[j].total -= cellscpy[j].black;
                 cellscpy[j].black = 0;
             } else if (strcmp(seed_placed, "S") == 0) {
-                // fprintf(f, "Capturing special cells B %d R %d S %d \n", cellscpy[j].black, cellscpy[j].red, cellscpy[j].special);
                 if (cellscpy[j].black >= 2 && cellscpy[j].black <= 3) {
+                    cellscpy[j].total -= cellscpy[j].black;
                     scores_gain += cellscpy[j].black;
                     cellscpy[j].black = 0;
                 }
                 if (cellscpy[j].red >= 2 && cellscpy[j].red <= 3) {
+                    cellscpy[j].total -= cellscpy[j].red;
                     scores_gain += cellscpy[j].red;
                     cellscpy[j].red = 0;
                 }
             } else {
                 capture = false;
             }
+        } else {
+            capture = false;
         }
         if (stones.total == 0) {
-            // fprintf(f, "No more stonesss!\n");
             break;
         }
     }
-
+    printf("newpos player %d capt_idx %d start_index %d last_index %d scores %d\n",
+            newPos.player, capt_index, first_index, last_index, scores_gain);
+    printf("on position hole %d parent_idx %d current_idx %d score gained after move %d\n",
+            position.move.hole, position.parent_idx, position.current_idx, scores_gain);
     if (scores_gain > 0 && newPos.player == 0) {
-        printf("computer gained: %d", scores_gain);
+        printf("computer gained: %d\n", scores_gain);
+        printf("on position hole %d parent_idx %d current_idx %d score gained after move %d\n",
+            position.move.hole, position.parent_idx, position.current_idx, scores_gain);
         newPos.seeds_computer += scores_gain;
-    } else if (scores_gain > 0 && newPos.player == 0) {
-        printf("player gained: %d", scores_gain);
+    } else if (scores_gain > 0 && newPos.player == 1) {
+        printf("player gained: %d\n", scores_gain);
+        printf("on position hole %d parent_idx %d current_idx %d score gained after move %d\n",
+            position.move.hole, position.parent_idx, position.current_idx, scores_gain);
         newPos.seeds_player += scores_gain;
     }
 
     memcpy(newPos.cells, cellscpy, sizeof(Cell)*12);
     return newPos;
 }
-
-// int capture(Hole move, int last_pos, int looped, int player, Cell * cells) {
-//     // take note of edge case when it loops the entire round
-//     // check based on last pos backwards to see if can capture
-//     // can we only seeds on our side?! yes if the last position is on
-//     // the other side, reset to the max on our side.
-//     int scores = 0;
-//     int first_index = (player == 0) ? 6 : 0;
-//     int last_index = (player == 0) ? 11 : 5;
-//     if (looped == 1) {
-//         last_pos = last_index;
-//     }
-//     int special_seed_pos = move.hole + move.spos;
-    
-
-//     for (int i = last_pos; i > move.hole && i >= first_index && i <= last_index; i--) {
-//         // int idx = i % 12;
-//         if (strcmp(move.colour, "R") == 0) {
-//             // this means that last colour is B
-//         }
-//         if (cells[i] >= 2 && cells[i] <= 3) {
-//             scores += cells[i];
-//             cells[i] = 0;
-//         } else {
-//             break;
-//         }
-//     }
-
-//     return scores;
-// }
