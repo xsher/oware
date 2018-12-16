@@ -35,6 +35,7 @@ typedef struct Position {
 typedef struct Mouve {
     int score;
     Pos position;
+    Pos leaf;
 } Move;
 
 void startGame(Pos position, int maxDepth);
@@ -151,7 +152,8 @@ void startGame(Pos position, int maxDepth) {
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
-            printf("Computer has played the move on hole: %d\n", position.move.hole);
+            printf("Computer has played the move on hole: %d and colour %s\n",
+                position.move.hole, position.move.colour);
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
@@ -229,8 +231,8 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
         Move move;
         move.score = evaluate(position);
         move.position = copyPos(position);
-        printf("Score at hole %d colour %s leaf %d depth %d idx %d parent_idx %d\n",
-            position.move.hole,position.move.colour, move.score, depth, parent_idx, position.parent_idx);
+        // printf("Score at hole %d colour %s leaf %d depth %d idx %d parent_idx %d\n",
+        //     position.move.hole,position.move.colour, move.score, depth, parent_idx, position.parent_idx);
         return move;
     }
 
@@ -261,6 +263,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
                     // initialization of value if not given
                     bestMove.score = childPos.score;
                     bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
+                    bestMove.leaf = (newDepth == 0) ? copyPos(childPos.position) : childPos.leaf;
                     first_valid = 1;
                     // printf("initialized score to maximise %d current_idx %d childposidx %d score %d depth %d\n",
                     //     maximisingPlayer, newPos.parent_idx, childPos.idx, bestMove.score, depth);
@@ -269,6 +272,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
                         (!maximisingPlayer && childPos.score < bestMove.score)) {
                     bestMove.score = childPos.score;
                     bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
+                    if (newDepth == 0 ) bestMove.leaf = copyPos(childPos.position);
 
                     // printf("Better score! Updated score to maximise %d current_idx %d childposidx %d score %d depth %d\n",
                     //     maximisingPlayer, newPos.parent_idx, childPos.idx, bestMove.score, depth);
@@ -280,7 +284,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
                 }
             }
             if (beta <= alpha) {
-                printf("Pruning\n");
+                // printf("Pruning\n");
                 break;
             }
             idx++;
@@ -408,8 +412,8 @@ Pos move(Pos position) {
     int special_seed_pos = newPos.move.hole + newPos.move.spos;
 
     int capt_index;
-    int first_index = (newPos.player == 1) ? 6 : 0;
-    int last_index = (newPos.player == 1) ? 11 : 5;
+    int first_index = (newPos.player == 0) ? 6 : 0;
+    int last_index = (newPos.player == 0) ? 11 : 5;
     capt_index = (looped == 1) ? last_index : newPos.last_pos;
 
     // breaks out when there is no stones left
