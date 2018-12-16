@@ -33,7 +33,6 @@ typedef struct Position {
 } Pos;
 
 typedef struct Mouve {
-    int idx;
     int score;
     Pos position;
 } Move;
@@ -177,7 +176,7 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
     // nextMove = minimax(nodes, initial, maximisingPlayer, maxDepth, 0, &counter);
 
     printf("Number of nodes traversed: %d\n", counter);
-    printf("Score for the move: %d idx %d\n", nextMove.score);
+    printf("Score for the move: %d\n", nextMove.score);
     return nextMove.position;
 }
 
@@ -228,7 +227,6 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
     int * counter = count;
     if (depth == 0) {
         Move move;
-        move.idx = parent_idx;
         move.score = evaluate(position);
         move.position = copyPos(position);
         printf("Score at hole %d colour %s leaf %d depth %d idx %d parent_idx %d\n",
@@ -241,7 +239,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
     Move bestMove;
 
     int first_valid = 0;
-    int index = (parent_idx * 6) + 1;
+    int index = (parent_idx * 12) + 1;
 
     int start_index = maximisingPlayer ? 0 : 6;
     int final_index = maximisingPlayer ? 5 : 11;
@@ -262,7 +260,6 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
                 if (first_valid == 0) {
                     // initialization of value if not given
                     bestMove.score = childPos.score;
-                    bestMove.idx = (newPos.current_idx == 0) ? childPos.idx : newPos.current_idx;
                     bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
                     first_valid = 1;
                     // printf("initialized score to maximise %d current_idx %d childposidx %d score %d depth %d\n",
@@ -271,7 +268,6 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
                 } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
                         (!maximisingPlayer && childPos.score < bestMove.score)) {
                     bestMove.score = childPos.score;
-                    bestMove.idx = (newPos.current_idx == 0) ? childPos.idx : newPos.current_idx;
                     bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
 
                     // printf("Better score! Updated score to maximise %d current_idx %d childposidx %d score %d depth %d\n",
