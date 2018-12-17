@@ -41,18 +41,18 @@ typedef struct Mouve {
 void startGame(Pos position, int maxDepth);
 Pos move(Pos position);
 int capture(Hole move, int last_pos, int looped, int player, Cell * cells);
-int evaluate(Pos position);
+int evaluate(Pos position, int * move_count);
 Pos copyPos(Pos p1);
 Hole requestMove(int player, Cell * cells);
 void requestSpecialSeed(Pos position);
 
 Move minimax(Pos position, bool maximisingPlayer,
     int depth, int parent_idx, int * count);
-Move minimaxAlphaBeta(Pos position, bool maximisingPlayer,
-    int alpha, int beta, int depth, int parent_idx, int * count);
+Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
+    int beta, int depth, int parent_idx, int * count, int * move_count);
 Pos generatePosition(Pos position, int hole, int col, int spos,
-    bool maximisingPlayer, int parent_idx);
-Pos computeComputerMove(Pos initial, int maxDepth);
+    bool maximisingPlayer, int parent_idx, int * move_count);
+Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt);
 
 
 void printBoard(Cell * b, int seeds_computer, int seeds_player) {
@@ -124,6 +124,7 @@ void requestSpecialSeed(Pos position) {
 void startGame(Pos position, int maxDepth) {
     int scores_gain;
     int maxSeeds = 74;    // 12 holes, 6 seeds each and 2 special seeds
+    int move_counter = 0;
 
     // while it is not game over yet
     while (position.seeds_computer <= maxSeeds/2 ||
@@ -137,7 +138,7 @@ void startGame(Pos position, int maxDepth) {
             struct timeval start, end;
             gettimeofday(&start, NULL);
 
-            position = computeComputerMove(position, maxDepth);
+            position = computeComputerMove(position, maxDepth, &move_counter);
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
@@ -146,6 +147,7 @@ void startGame(Pos position, int maxDepth) {
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
+        move_counter += 1;
         printf("Current board status:\n");
         printBoard(position.cells, position.seeds_computer, position.seeds_player);
         position.player = (position.player == 1) ? 0 : 1;
@@ -154,7 +156,7 @@ void startGame(Pos position, int maxDepth) {
     printf("GAME OVER.\n");
 }
 
-Pos computeComputerMove(Pos initial, int maxDepth) {
+Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
     // Initial move is a move by player 1
     initial.player = 1;
 
@@ -163,14 +165,17 @@ Pos computeComputerMove(Pos initial, int maxDepth) {
 
     // the first move that is feeded is always the move that has been done by the player
     int counter = 0;
-    nextMove = minimaxAlphaBeta(initial, maximisingPlayer, -76, 76, maxDepth, 0, &counter);
+    int * move_counter = move_cnt;
+
+    nextMove = minimaxAlphaBeta(initial, maximisingPlayer, -76, 76,
+                                maxDepth, 0, &counter, move_counter);
 
     printf("Number of nodes traversed: %d\n", counter);
     printf("Score for the move: %d\n", nextMove.score);
     return nextMove.position;
 }
 
-int evaluate(Pos position) {
+int evaluate(Pos position, int * move_count) {
     return position.seeds_computer - position.seeds_player;
 }
 
@@ -190,10 +195,12 @@ Pos copyPos(Pos p1) {
     return p2;
 }
 
-Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingPlayer, int parent_idx) {
+Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingPlayer,
+                    int parent_idx, int * move_count) {
     Pos newPos = copyPos(position);
 
     char colours[3] = "RB";
+    int * move_counter = move_count;
 
     newPos.move.hole = hole;
     newPos.move.spos = spos;
@@ -206,19 +213,20 @@ Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingP
         newPos.valid_move = 0;
     }
     newPos.player = (position.player == 1) ? 0 : 1;
-    newPos.evaluation = evaluate(position);
+    newPos.evaluation = evaluate(position, move_counter);
     newPos.parent_idx = parent_idx;
 
     return newPos;
 }
 
-Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
-                      int beta, int depth, int parent_idx, int * count) {
+Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
+                int depth, int parent_idx, int * count, int * move_count) {
     *count += 1;
     int * counter = count;
+    int * move_counter = move_count;
     if (depth == 0) {
         Move move;
-        move.score = evaluate(position);
+        move.score = evaluate(position, move_counter);
         move.position = copyPos(position);
         move.leaf = copyPos(position);
         return move;
@@ -241,7 +249,8 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
         for (int i = 0; i < 2; i++) {
             int total_steps = (original_cells[j].special > 0) ? original_cells[j].total : 1;
             for (int l = 1; l <= total_steps; l++) {
-                Pos newPos = generatePosition(position, j, i, l, maximisingPlayer, parent_idx);
+                Pos newPos = generatePosition(position, j, i, l, maximisingPlayer,
+                                parent_idx, move_counter);
                 newPos.current_idx = idx + index;
 
                 if (newPos.valid_move == 1) {
@@ -250,7 +259,8 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
                     Pos feedPos = copyPos(newPos);
 
                     bool toMax = maximisingPlayer ? false : true;
-                    childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, index + idx, counter);
+                    childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, index + idx,
+                                counter, move_counter);
 
                     if (first_valid == 0) {
                         // initialization of value if not given
