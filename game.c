@@ -115,7 +115,7 @@ void requestSpecialSeed(Pos position) {
         scanf("%d", &special_hole);
     } while (!(special_hole >= 0 && special_hole <= 11));
 
-    position.cells[special_hole].special = 1;
+    position.cells[special_hole].special += 1;
     position.cells[special_hole].total += 1;
     printf("Board status after placing special seed.\n");
     printBoard(position.cells, position.seeds_computer, position.seeds_player);
