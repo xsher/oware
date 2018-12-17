@@ -44,6 +44,7 @@ int capture(Hole move, int last_pos, int looped, int player, Cell * cells);
 int evaluate(Pos position);
 Pos copyPos(Pos p1);
 Hole requestMove(int player, Cell * cells);
+void requestSpecialSeed(Pos position);
 
 Move minimax(Pos position, bool maximisingPlayer,
     int depth, int parent_idx, int * count);
@@ -97,6 +98,12 @@ int main(void) {
     } while (position.player != 0 && position.player != 1);
     printf("\nStarting the game with player: %d\n", position.player);
 
+    printf("Player %d", position.player);
+    requestSpecialSeed(position);
+
+    printf("Player %d ", (position.player == 0) ? 1 : 0);
+    requestSpecialSeed(position);
+
     startGame(position, maxDepth);
 }
 
@@ -117,8 +124,6 @@ void requestSpecialSeed(Pos position) {
 void startGame(Pos position, int maxDepth) {
     int scores_gain;
     int maxSeeds = 74;    // 12 holes, 6 seeds each and 2 special seeds
-    bool first_p = true;  // used to indicate initialization of special seed
-    bool first_c = true;
 
     // while it is not game over yet
     while (position.seeds_computer <= maxSeeds/2 ||
@@ -126,19 +131,9 @@ void startGame(Pos position, int maxDepth) {
         printf("\nPlayer %d turn\n", position.player);
 
         if (position.player == 1) {
-            if (first_p) {
-                requestSpecialSeed(position);
-                first_p = false;
-            } 
-
             position.move = requestMove(position.player, position.cells);
             position = move(position);
         } else {
-            if (first_c) {
-                requestSpecialSeed(position);
-                first_c = false;
-            }
-
             struct timeval start, end;
             gettimeofday(&start, NULL);
 
@@ -198,7 +193,7 @@ Pos copyPos(Pos p1) {
 Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingPlayer, int parent_idx) {
     Pos newPos = copyPos(position);
 
-    char colours[4] = "RBS";
+    char colours[3] = "RB";
 
     newPos.move.hole = hole;
     newPos.move.spos = spos;
@@ -243,9 +238,9 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
     int final_index = maximisingPlayer ? 5 : 11;
 
     for (int j = start_index; j <= final_index; j++) {   
-        for (int i = 0; i < 3; i++) {
-            for (int l = 1; l <= original_cells[j].total; l++) {
-
+        for (int i = 0; i < 2; i++) {
+            int total_steps = (original_cells[j].special > 0) ? original_cells[j].total : 1;
+            for (int l = 1; l <= total_steps; l++) {
                 Pos newPos = generatePosition(position, j, i, l, maximisingPlayer, parent_idx);
                 newPos.current_idx = idx + index;
 
