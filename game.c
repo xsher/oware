@@ -204,6 +204,7 @@ Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingP
 
     newPos.move.hole = hole;
     newPos.move.spos = spos;
+    newPos.player = (position.player == 1) ? 0 : 1;
     memcpy(newPos.move.colour, &colours[col], sizeof(char));
 
     if (newPos.cells[hole].total > 0) {
@@ -212,7 +213,6 @@ Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingP
     } else {
         newPos.valid_move = 0;
     }
-    newPos.player = (position.player == 1) ? 0 : 1;
     newPos.evaluation = evaluate(position, move_counter);
     newPos.parent_idx = parent_idx;
 
@@ -350,12 +350,14 @@ Pos move(Pos position) {
     int capt_index;
     int first_index = (newPos.player == 0) ? 6 : 0;
     int last_index = (newPos.player == 0) ? 11 : 5;
-    capt_index = (looped == 1) ? last_index : newPos.last_pos;
+    capt_index = (looped == 1) ? last_index : newPos.last_pos % 12;
 
     // breaks out when there is no stones left
     for (int j = newPos.last_pos; ; j--) {
-        if (j == capt_index) capture = true;
-        if (j == newPos.move.hole) {
+        int cellid = j % 12;
+
+        if (cellid == capt_index) capture = true;
+        if (cellid == newPos.move.hole) {
             capture = false;
             continue;
         }
@@ -363,56 +365,58 @@ Pos move(Pos position) {
         char seed_placed[2];
 
         if (j == special_seed_pos & stones.special > 0) {
-            cellscpy[j%12].special += 1;
+            cellscpy[cellid].special += 1;
             strncpy(seed_placed, "S", 2);
             stones.special--;
         } else if (strcmp(newPos.move.colour, "R") == 0 && stones.black > 0) {
-            cellscpy[j%12].black += 1;
+            cellscpy[cellid].black += 1;
             strncpy(seed_placed, "B", 2);
             stones.black--;
         } else if (strcmp(newPos.move.colour, "B") == 0 && stones.red > 0) {
-            cellscpy[j%12].red += 1;
+            cellscpy[cellid].red += 1;
             strncpy(seed_placed, "R", 2);
             stones.red--;
         } else if (stones.black > 0) {
-            cellscpy[j%12].black += 1;
+            cellscpy[cellid].black += 1;
             strncpy(seed_placed, "B", 2);
             stones.black--;
         } else if (stones.red > 0) {
-            cellscpy[j%12].red += 1;
+            cellscpy[cellid].red += 1;
             strncpy(seed_placed, "R", 2);
             stones.red--;
         }
 
-        cellscpy[j%12].total += 1;
+        cellscpy[cellid].total += 1;
         stones.total--;
 
-        if (capture && j>= first_index && j <= last_index) {
-            if (strcmp(seed_placed, "R") == 0 && cellscpy[j].red >= 2 && cellscpy[j].red <= 3) {
-                scores_gain += cellscpy[j].red;
-                cellscpy[j].total -= cellscpy[j].red;
-                cellscpy[j].red = 0;
-            } else if (strcmp(seed_placed, "B") == 0 && cellscpy[j].black >= 2 && cellscpy[j].black <= 3) {
-                scores_gain += cellscpy[j].black;
-                cellscpy[j].total -= cellscpy[j].black;
-                cellscpy[j].black = 0;
+        if (capture && cellid >= first_index && cellid <= last_index) {
+            if (strcmp(seed_placed, "R") == 0 && cellscpy[cellid].red >= 2 && cellscpy[cellid].red <= 3) {
+                scores_gain += cellscpy[cellid].red;
+                cellscpy[cellid].total -= cellscpy[cellid].red;
+                cellscpy[cellid].red = 0;
+            } else if (strcmp(seed_placed, "B") == 0 && cellscpy[cellid].black >= 2 && cellscpy[cellid].black <= 3) {
+                scores_gain += cellscpy[cellid].black;
+                cellscpy[cellid].total -= cellscpy[cellid].black;
+                cellscpy[cellid].black = 0;
             } else if (strcmp(seed_placed, "S") == 0) {
-                if (cellscpy[j].black >= 2 && cellscpy[j].black <= 3) {
-                    cellscpy[j].total -= cellscpy[j].black;
-                    cellscpy[j].total--; // minus special seed
-                    scores_gain += cellscpy[j].black;
-                    scores_gain++; // add special seed
-                    cellscpy[j].black = 0;
-                    cellscpy[j].special = 0;
+                int black_seeds = cellscpy[cellid].black + cellscpy[cellid].special;
+                int red_seeds = cellscpy[cellid].red + cellscpy[cellid].special;
+                int gained_special = 0;
+
+                if (black_seeds >= 2 && black_seeds <= 3) {
+                    cellscpy[cellid].total -= cellscpy[cellid].black;
+                    scores_gain += black_seeds;
+                    cellscpy[cellid].black = 0;
+                    cellscpy[cellid].special = 0;
+                    gained_special = 1;
                 }
-                if (cellscpy[j].red >= 2 && cellscpy[j].red <= 3) {
-                    cellscpy[j].total -= cellscpy[j].red;
-                    cellscpy[j].total--; // minus special seed
-                    scores_gain += cellscpy[j].red;
-                    scores_gain++; // add special seed
-                    cellscpy[j].red = 0;
-                    cellscpy[j].special = 0;
+                if (red_seeds >= 2 && red_seeds <= 3) {
+                    cellscpy[cellid].total -= cellscpy[cellid].red;
+                    scores_gain += red_seeds;
+                    cellscpy[cellid].red = 0;
+                    cellscpy[cellid].special = 0;
                 }
+                if (gained_special == 1) cellscpy[cellid].total--; // minus special seed only once
             } else {
                 capture = false;
             }
@@ -423,9 +427,9 @@ Pos move(Pos position) {
             break;
         }
     }
-    if (scores_gain > 0 && newPos.player == 1) {
+    if (scores_gain > 0 && newPos.player == 0) {
         newPos.seeds_computer += scores_gain;
-    } else if (scores_gain > 0 && newPos.player == 0) {
+    } else if (scores_gain > 0 && newPos.player == 1) {
         newPos.seeds_player += scores_gain;
     }
 
