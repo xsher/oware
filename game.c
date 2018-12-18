@@ -144,7 +144,7 @@ void startGame(Pos position, int maxDepth) {
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
             printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
-                position.move.hole, position.move.colour);
+                position.move.hole, position.move.colour, position.move.spos);
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
@@ -366,30 +366,31 @@ Pos move(Pos position) {
     cellscpy[position.move.hole] = empty;
 
     int scores_gain = 0;
-    bool capture = false; // determines if still fit the capture criteria
+    int capture = 0; // 0 refers to non-capture state, -1 has captured, 1 can capture
     int looped = (newPos.cells[newPos.move.hole].total > 11) ? 1 : 0;
     newPos.last_pos = newPos.move.hole + newPos.cells[newPos.move.hole].total;
     if (looped) newPos.last_pos += 1;
-    int special_seed_pos = newPos.move.hole + newPos.move.spos;
+    int special_seed_pos = (newPos.move.hole + newPos.move.spos) % 12;
 
     int capt_index;
     int first_index = (newPos.player == 0) ? 6 : 0;
     int last_index = (newPos.player == 0) ? 11 : 5;
-    capt_index = (looped == 1) ? last_index : newPos.last_pos % 12;
+
+    capt_index = newPos.last_pos % 12;
+    if (!(capt_index >= first_index && capt_index <= last_index)) capt_index = last_index;
 
     // breaks out when there is no stones left
     for (int j = newPos.last_pos; ; j--) {
         int cellid = j % 12;
 
-        if (cellid == capt_index) capture = true;
+        if (cellid == capt_index && capture == 0) capture = 1;
         if (cellid == newPos.move.hole) {
-            capture = false;
             continue;
         }
 
         char seed_placed[2];
 
-        if (j == special_seed_pos & stones.special > 0) {
+        if (cellid == special_seed_pos & stones.special > 0) {
             cellscpy[cellid].special += 1;
             strncpy(seed_placed, "S", 2);
             stones.special--;
@@ -414,7 +415,7 @@ Pos move(Pos position) {
         cellscpy[cellid].total += 1;
         stones.total--;
 
-        if (capture && cellid >= first_index && cellid <= last_index) {
+        if (capture == 1 && cellid >= first_index && cellid <= last_index) {
             if (strcmp(seed_placed, "R") == 0 && cellscpy[cellid].red >= 2 && cellscpy[cellid].red <= 3) {
                 scores_gain += cellscpy[cellid].red;
                 cellscpy[cellid].total -= cellscpy[cellid].red;
@@ -443,10 +444,10 @@ Pos move(Pos position) {
                 }
                 if (gained_special == 1) cellscpy[cellid].total--; // minus special seed only once
             } else {
-                capture = false;
+                capture = -1;
             }
         } else {
-            capture = false;
+            capture = -1;
         }
         if (stones.total == 0) {
             break;
