@@ -27,6 +27,7 @@ typedef struct Position {
     int parent_idx;     // position's index in the array
     int valid_move;     // 0 if not valid
     int evaluation;
+    int seeds_diff;
     int current_idx;    // idx on the array
     Hole move;          // which hole was chosen
     int last_pos;
@@ -42,13 +43,12 @@ typedef struct Mouve {
 void startGame(Pos position, int maxDepth);
 Pos move(Pos position);
 int capture(Hole move, int last_pos, int looped, int player, Cell * cells);
-int evaluate(Pos position, int * move_count);
+int evaluate_score(Pos position);
+int evaluate_seeds(Pos position);
 Pos copyPos(Pos p1);
 Hole requestMove(int player, Cell * cells);
 void requestSpecialSeed(Pos position);
 
-Move minimax(Pos position, bool maximisingPlayer,
-    int depth, int parent_idx, int * count);
 Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
     int beta, int depth, int maxDepth, int parent_idx, int * count, int * move_count);
 Pos generatePosition(Pos position, int hole, int col, int spos,
@@ -85,7 +85,8 @@ int main(void) {
     Hole hole = { .hole = -1 };
     Pos position = { .cells = cells, .seeds_player = 0, .seeds_computer = 0,
                     .parent_idx = -1, .valid_move = 0, .evaluation = -80,
-                    .move = hole, .last_pos = -1, .current_idx = 0};
+                    .move = hole, .last_pos = -1, .current_idx = 0,
+                    .seeds_diff = 0};
 
     printf("Initializing Game Board\n");
     printBoard(position.cells, position.seeds_computer, position.seeds_player);
@@ -176,8 +177,17 @@ Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
     return nextMove.position;
 }
 
-int evaluate(Pos position, int * move_count) {
+int evaluate_score(Pos position) {
     return position.seeds_computer - position.seeds_player;
+}
+
+int evaluate_seeds(Pos position) {
+    int sum_comp = 0;
+    int sum_player = 0;
+    for (int i = 0; i < 6; i++) sum_comp += position.cells[i].total;
+    for (int j = 0; j < 6; j++) sum_player += position.cells[j].total;
+
+    return sum_comp - sum_player;
 }
 
 Pos copyPos(Pos p1) {
@@ -214,7 +224,12 @@ Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingP
     } else {
         newPos.valid_move = 0;
     }
-    newPos.evaluation = evaluate(position, move_counter);
+    newPos.evaluation = evaluate_score(position);
+
+    // start computing for remaining seeds only when the game is towards the end
+    // prevent excessive computation at the start
+    int remaining_seeds = 76 - newPos.seeds_player - newPos.seeds_computer;
+    newPos.seeds_diff = (remaining_seeds < 25) ? evaluate_seeds(position) : 0;
     newPos.parent_idx = parent_idx;
 
     return newPos;
@@ -226,9 +241,10 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
     int * counter = count;
     int * move_counter = move_count;
     if (depth == 0) {
-        Move move;
-        move.score = evaluate(position, move_counter);
+        bool game_ending = (76 - position.seeds_player - position.seeds_computer < 25) ? true : false;
 
+        Move move;
+        move.score = (game_ending) ? position.seeds_diff : position.evaluation;
         move.position = copyPos(position);
         move.leaf = copyPos(position);
         return move;
