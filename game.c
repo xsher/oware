@@ -40,14 +40,14 @@ typedef struct Mouve {
     int found_better;
 } Move;
 
-void startGame(Pos position, int maxDepth);
+void startGame(Pos position, int maxDepth, int first_player);
 Pos move(Pos position);
 int capture(Hole move, int last_pos, int looped, int player, Cell * cells);
 int evaluate_score(Pos position);
 int evaluate_seeds(Pos position);
 Pos copyPos(Pos p1);
 Hole requestMove(int player, Cell * cells);
-void requestSpecialSeed(Pos position);
+void requestSpecialSeed(Pos position, int first_player);
 
 Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
     int beta, int depth, int maxDepth, int parent_idx, int * count, int * move_count);
@@ -56,7 +56,7 @@ Pos generatePosition(Pos position, int hole, int col, int spos,
 Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt);
 
 
-void printBoard(Cell * b, int seeds_computer, int seeds_player) {
+void printBoard(Cell * b, int seeds_computer, int seeds_player, int first_player) {
     printf("\nComputer side\n");
     printf("             1           2            3            4             5           6\n");
     printf("-------------------------------------------------------------------------------------------\n");
@@ -71,6 +71,23 @@ void printBoard(Cell * b, int seeds_computer, int seeds_player) {
     printf("-------------------------------------------------------------------------------------------\n");
     printf("           12            11           10           9             8           7\n");
     printf("Player side\n\n");
+}
+
+void fprintBoard(FILE * f, Cell * b, int seeds_computer, int seeds_player, int first_player) {
+    fprintf(f, "\nComputer side\n");
+    fprintf(f, "             1           2            3            4             5           6\n");
+    fprintf(f, "-------------------------------------------------------------------------------------------\n");
+    fprintf(f, "|%5d|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5s|\n", seeds_computer,
+            b[0].red, b[0].black, b[0].special, b[1].red, b[1].black, b[1].special, b[2].red, b[2].black, b[2].special,
+            b[3].red, b[3].black, b[3].special, b[4].red, b[4].black, b[4].special, b[5].red, b[5].black, b[5].special, "");
+    fprintf(f, "       -----------------------------------------------------------------------------      \n");
+    fprintf(f, "|%5s|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5d|\n", "",
+            b[11].red, b[11].black, b[11].special, b[10].red, b[10].black, b[10].special, b[9].red, b[9].black, b[9].special,
+            b[8].red, b[8].black, b[8].special, b[7].red, b[7].black, b[7].special, b[6].red, b[6].black, b[6].special,
+            seeds_player);
+    fprintf(f, "-------------------------------------------------------------------------------------------\n");
+    fprintf(f, "           12            11           10           9             8           7\n");
+    fprintf(f, "Player side\n\n");
 }
 
 int main(void) {
@@ -89,7 +106,7 @@ int main(void) {
                     .seeds_diff = 0};
 
     printf("Initializing Game Board\n");
-    printBoard(position.cells, position.seeds_computer, position.seeds_player);
+    printBoard(position.cells, position.seeds_computer, position.seeds_player, 0);
 
     printf("What is the maxDepth?  ");
     scanf("%d", &maxDepth);
@@ -100,16 +117,21 @@ int main(void) {
     } while (position.player != 0 && position.player != 1);
     printf("\nStarting the game with player: %d\n", position.player);
 
+    int first_player = position.player;
     printf("Player %d", position.player);
-    requestSpecialSeed(position);
+    requestSpecialSeed(position, first_player);
+    printf("Board status after placing special seed.\n");
+    printBoard(position.cells, position.seeds_computer, position.seeds_player, first_player);
 
     printf("Player %d ", (position.player == 0) ? 1 : 0);
-    requestSpecialSeed(position);
+    requestSpecialSeed(position, first_player);
+    printf("Board status after placing special seed.\n");
+    printBoard(position.cells, position.seeds_computer, position.seeds_player, first_player);
 
-    startGame(position, maxDepth);
+    startGame(position, maxDepth, first_player);
 }
 
-void requestSpecialSeed(Pos position) {
+void requestSpecialSeed(Pos position, int start_player) {
     int special_hole;
 
     do {
@@ -120,14 +142,15 @@ void requestSpecialSeed(Pos position) {
 
     position.cells[special_hole].special += 1;
     position.cells[special_hole].total += 1;
-    printf("Board status after placing special seed.\n");
-    printBoard(position.cells, position.seeds_computer, position.seeds_player);
 }
 
-void startGame(Pos position, int maxDepth) {
+void startGame(Pos position, int maxDepth, int first_player) {
     int scores_gain;
     int maxSeeds = 74;    // 12 holes, 6 seeds each and 2 special seeds
     int move_counter = 0;
+
+    FILE * f = fopen("game.txt", "w");
+    fprintBoard(f, position.cells, position.seeds_computer, position.seeds_player, first_player);
 
     // while it is not game over yet
     while (position.seeds_computer <= maxSeeds/2 ||
@@ -137,6 +160,8 @@ void startGame(Pos position, int maxDepth) {
         if (position.player == 1) {
             position.move = requestMove(position.player, position.cells);
             position = move(position);
+            fprintf(f, "Player has played the move on hole %d, colour %s and special seed at %d.\n",
+                position.move.hole + 1, position.move.colour, position.move.spos);
         } else {
             struct timeval start, end;
             gettimeofday(&start, NULL);
@@ -147,12 +172,16 @@ void startGame(Pos position, int maxDepth) {
               ((end.tv_usec - start.tv_usec)/1000000.0);
             printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
                 position.move.hole + 1, position.move.colour, position.move.spos);
+            fprintf(f, "Computer has played the move on hole %d, colour %s and special seed at %d.\n",
+                position.move.hole + 1, position.move.colour, position.move.spos);
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
         move_counter += 1;
         printf("Current board status:\n");
-        printBoard(position.cells, position.seeds_computer, position.seeds_player);
+        printBoard(position.cells, position.seeds_computer, position.seeds_player, first_player);
+        fprintBoard(f, position.cells, position.seeds_computer, position.seeds_player, first_player);
+
         position.player = (position.player == 1) ? 0 : 1;
     }
 
@@ -160,6 +189,7 @@ void startGame(Pos position, int maxDepth) {
 }
 
 Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
+    printf("Called compute computer\n");
     // Initial move is a move by player 1
     initial.player = 1;
 
@@ -241,6 +271,8 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
     *count += 1;
     int * counter = count;
     int * move_counter = move_count;
+    // printf("2");
+    // if (*move_count % 1000 == 0 ) printf("1000");
     if (depth == 0) {
         bool game_ending = (76 - position.seeds_player - position.seeds_computer < 25) ? true : false;
 
