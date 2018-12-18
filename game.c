@@ -199,7 +199,6 @@ Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
     // the first move that is feeded is always the move that has been done by the player
     int counter = 0;
     int * move_counter = move_cnt;
-
     nextMove = minimaxAlphaBeta(initial, maximisingPlayer, -76, 76,
                                 maxDepth, maxDepth, 0, &counter, move_counter);
 
@@ -368,12 +367,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
 
         Pos bstPos = generatePosition(position, minhole, 1, position.move.spos,
                         maximisingPlayer, parent_idx, move_counter);
-        bestMove.position = bstPos;
-        bestMove.score = bstPos.evaluation;
-        while (bstPos.valid_move == 0) {
-            minhole += 1;
-            Pos bstPos = generatePosition(position, minhole, 1, position.move.spos,
-                        maximisingPlayer, parent_idx, move_counter);
+        if (bstPos.valid_move == 1) {
             bestMove.position = bstPos;
             bestMove.score = bstPos.evaluation;
         }
