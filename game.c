@@ -58,7 +58,7 @@ Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt);
 
 void printBoard(Cell * b, int seeds_computer, int seeds_player) {
     printf("\nComputer side\n");
-    printf("             0           1            2            3             4           5\n");
+    printf("             1           2            3            4             5           6\n");
     printf("-------------------------------------------------------------------------------------------\n");
     printf("|%5d|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5s|\n", seeds_computer,
             b[0].red, b[0].black, b[0].special, b[1].red, b[1].black, b[1].special, b[2].red, b[2].black, b[2].special,
@@ -69,7 +69,7 @@ void printBoard(Cell * b, int seeds_computer, int seeds_player) {
             b[8].red, b[8].black, b[8].special, b[7].red, b[7].black, b[7].special, b[6].red, b[6].black, b[6].special,
             seeds_player);
     printf("-------------------------------------------------------------------------------------------\n");
-    printf("           11            10           9            8             7           6\n");
+    printf("           12            11           10           9             8           7\n");
     printf("Player side\n\n");
 }
 
@@ -115,6 +115,7 @@ void requestSpecialSeed(Pos position) {
     do {
         printf("\nWhere would you like to place the special seed?  ");
         scanf("%d", &special_hole);
+        special_hole -= 1;
     } while (!(special_hole >= 0 && special_hole <= 11));
 
     position.cells[special_hole].special += 1;
@@ -145,7 +146,7 @@ void startGame(Pos position, int maxDepth) {
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
             printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
-                position.move.hole, position.move.colour, position.move.spos);
+                position.move.hole + 1, position.move.colour, position.move.spos);
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
@@ -359,6 +360,7 @@ Hole requestMove(int player, Cell * cells) {
             }
             printf("\t");
             scanf("%d", &request.hole);
+            request.hole -= 1;
         } while(!(request.hole >= 0 && request.hole <= 5) || cells[request.hole].total == 0);
     } else {
         do {
@@ -367,6 +369,7 @@ Hole requestMove(int player, Cell * cells) {
                 if (cells[i].total > 0) printf("%d ", i);
             }
             scanf("%d", &request.hole);
+            request.hole -= 1;
         } while(!(request.hole >= 6 && request.hole <= 11) || cells[request.hole].total == 0);
     }
 
