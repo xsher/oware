@@ -36,6 +36,7 @@ typedef struct Mouve {
     int score;
     Pos position;
     Pos leaf;
+    int found_better;
 } Move;
 
 void startGame(Pos position, int maxDepth);
@@ -49,7 +50,7 @@ void requestSpecialSeed(Pos position);
 Move minimax(Pos position, bool maximisingPlayer,
     int depth, int parent_idx, int * count);
 Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
-    int beta, int depth, int parent_idx, int * count, int * move_count);
+    int beta, int depth, int maxDepth, int parent_idx, int * count, int * move_count);
 Pos generatePosition(Pos position, int hole, int col, int spos,
     bool maximisingPlayer, int parent_idx, int * move_count);
 Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt);
@@ -142,7 +143,7 @@ void startGame(Pos position, int maxDepth) {
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
-            printf("Computer has played the move on hole: %d and colour %s\n",
+            printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
                 position.move.hole, position.move.colour);
             printf("Time taken for computer %f\n\n", elapsed);
         }
@@ -168,7 +169,7 @@ Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
     int * move_counter = move_cnt;
 
     nextMove = minimaxAlphaBeta(initial, maximisingPlayer, -76, 76,
-                                maxDepth, 0, &counter, move_counter);
+                                maxDepth, maxDepth, 0, &counter, move_counter);
 
     printf("Number of nodes traversed: %d\n", counter);
     printf("Score for the move: %d\n", nextMove.score);
@@ -220,13 +221,14 @@ Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingP
 }
 
 Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
-                int depth, int parent_idx, int * count, int * move_count) {
+                int depth, int maxDepth, int parent_idx, int * count, int * move_count) {
     *count += 1;
     int * counter = count;
     int * move_counter = move_count;
     if (depth == 0) {
         Move move;
         move.score = evaluate(position, move_counter);
+
         move.position = copyPos(position);
         move.leaf = copyPos(position);
         return move;
@@ -235,6 +237,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
     int idx = 0;
     int newDepth = depth - 1;
     Move bestMove;
+    bestMove.found_better = 0;
 
     Cell * original_cells = (Cell *) malloc (sizeof(Cell)*12);
     memcpy(original_cells, position.cells, sizeof(Cell)*12);
@@ -245,10 +248,11 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
     int start_index = maximisingPlayer ? 0 : 6;
     int final_index = maximisingPlayer ? 5 : 11;
 
-    for (int j = start_index; j <= final_index; j++) {   
+    for (int j = start_index; j <= final_index; j++) {
         for (int i = 0; i < 2; i++) {
             int total_steps = (original_cells[j].special > 0) ? original_cells[j].total : 1;
             for (int l = 1; l <= total_steps; l++) {
+
                 Pos newPos = generatePosition(position, j, i, l, maximisingPlayer,
                                 parent_idx, move_counter);
                 newPos.current_idx = idx + index;
@@ -259,8 +263,8 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
                     Pos feedPos = copyPos(newPos);
 
                     bool toMax = maximisingPlayer ? false : true;
-                    childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, index + idx,
-                                counter, move_counter);
+                    childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, maxDepth,
+                                index + idx, counter, move_counter);
 
                     if (first_valid == 0) {
                         // initialization of value if not given
@@ -271,6 +275,7 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
 
                     } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
                             (!maximisingPlayer && childPos.score < bestMove.score)) {
+                        bestMove.found_better = 1;
                         bestMove.score = childPos.score;
                         bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
                         if (newDepth == 0 ) bestMove.leaf = copyPos(childPos.position);
@@ -290,6 +295,26 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
         }
     }
 
+
+    // if no best move, reinitialize the move
+    if (depth == maxDepth && bestMove.found_better == 0) {
+        int min = 999;
+        int minhole = 0;
+        int diff;
+
+        for (int i = final_index; i > start_index; i--) {
+            diff = abs(original_cells[i].total - original_cells[i-1].total);
+
+            if (diff <= min && !(i-2 >= 0 && original_cells[i-2].total <= 4)) {
+                min = diff;
+                minhole = i-1;
+            }
+        }
+        Pos bstPos = generatePosition(position, minhole, 1, position.move.spos,
+                                maximisingPlayer, parent_idx, move_counter);
+        bestMove.position = bstPos;
+        bestMove.score = bstPos.evaluation;
+    }
     return bestMove;
 }
 
