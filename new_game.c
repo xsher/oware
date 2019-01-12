@@ -189,7 +189,6 @@ void startGame(Pos position, int maxDepth, int first_player) {
 }
 
 Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
-    printf("Called compute computer\n");
     // Initial move is a move by player 1
     initial.player = 1;
 
@@ -413,6 +412,7 @@ Hole requestMove(int player, Cell * cells) {
 }
 
 Pos move(Pos position) {
+    // printf("Comes into move\n");
     // skip original position- change it to while loop
     Pos newPos;
     newPos = copyPos(position);
@@ -423,123 +423,120 @@ Pos move(Pos position) {
     Cell stones = cellscpy[newPos.move.hole];
     Cell empty = {0, 0 ,0};
     cellscpy[position.move.hole] = empty;
+    int original_total_stones = stones.total;
+    int looped = (original_total_stones > 11) ? 1 : 0;
 
-    int scores_gain = 0;
-    int capture = 0; // 0 refers to non-capture state, -1 has captured, 1 can capture
-    int looped = (newPos.cells[newPos.move.hole].total > 11) ? 1 : 0;
-    newPos.last_pos = newPos.move.hole + newPos.cells[newPos.move.hole].total;
-    int special_seed_pos = (newPos.move.hole + newPos.move.spos);
-    if (newPos.cells[newPos.move.hole].special > 1) special_seed_pos += 1;
-    if (looped == 1) {
-        newPos.last_pos += 1;
-        if (special_seed_pos > 11) special_seed_pos += 1;
+    // the capture colour should be the last color being stored
+    char capture_colour[2];
+    if (strcmp(newPos.move.colour, "R") == 0) {
+        strncpy(capture_colour, "B", 2);
+    } else {
+        strncpy(capture_colour, "R", 2);
     }
 
-    int capt_index;
-    int first_index = (newPos.player == 0) ? 6 : 0;
-    int last_index = (newPos.player == 0) ? 11 : 5;
+    int cellid = newPos.move.hole;
+    int idx = 1;
+    int pos_id;
 
-    capt_index = newPos.last_pos % 12;
-    if (!(capt_index >= first_index && capt_index <= last_index)) capt_index = last_index;
+    while (stones.total > 0) {
+        cellid++; // in order to get final index at the end
+        pos_id = cellid % 12;
 
-    char capture_colour[2] = "U"; // set to unknown
-
-    // breaks out when there is no stones left
-    for (int j = newPos.last_pos; ; j--) {
-        int cellid = j % 12;
-
-        if (cellid == capt_index && capture == 0) capture = 1;
-        if (cellid == newPos.move.hole) {
-            continue;
-        }
-
-        if (j == special_seed_pos & stones.special > 0) {
-            cellscpy[cellid].special += 1;
-            if (strcmp(capture_colour, "U") == 0) {
+        if (pos_id == newPos.move.hole) continue;
+        if (idx == newPos.move.spos && stones.special > 0) {
+            cellscpy[pos_id].special += 1;
+            stones.special--;
+            newPos.move.spos++; // just in case if there is 2 special seeds
+            // if special is the last seed then overwrite it
+            if (stones.total == 1) {
                 strncpy(capture_colour, "S", 2);
             }
-            special_seed_pos = (special_seed_pos - 1) % 12;
-            stones.special--;
-        } else if (strcmp(newPos.move.colour, "R") == 0 && stones.black > 0) {
-            cellscpy[cellid].black += 1;
-            if (strcmp(capture_colour, "U") == 0) {
-                strncpy(capture_colour, "B", 2);
-            }
-            stones.black--;
-        } else if (strcmp(newPos.move.colour, "B") == 0 && stones.red > 0) {
-            cellscpy[cellid].red += 1;
-            if (strcmp(capture_colour, "U") == 0) {
-                strncpy(capture_colour, "R", 2);
-            }
+        } else if (strcmp(newPos.move.colour, "R") == 0 && stones.red > 0) {
+            cellscpy[pos_id].red += 1;
             stones.red--;
+        } else if (strcmp(newPos.move.colour, "B") == 0 && stones.black > 0) {
+            cellscpy[pos_id].black += 1;
+            stones.black--;
         } else if (stones.black > 0) {
-            cellscpy[cellid].black += 1;
-            if (strcmp(capture_colour, "U") == 0) {
-                strncpy(capture_colour, "B", 2);
-            }
+            cellscpy[pos_id].black += 1;
             stones.black--;
         } else if (stones.red > 0) {
-            cellscpy[cellid].red += 1;
-            if (strcmp(capture_colour, "U") == 0) {
-                strncpy(capture_colour, "R", 2);
-            }
+            cellscpy[pos_id].red += 1;
             stones.red--;
         }
 
-        cellscpy[cellid].total += 1;
+        // double check if idx is added correctly
+        idx++;
+        cellscpy[pos_id].total += 1;
         stones.total--;
+    }
+    // store the final index
+    newPos.last_pos = cellid % 12;
 
-        if (capture == 1 && cellid >= first_index && cellid <= last_index) {
-            int black_seeds = cellscpy[cellid].black + cellscpy[cellid].special;
-            int red_seeds = cellscpy[cellid].red + cellscpy[cellid].special;
+    // write capture here
+    int first_index = (newPos.player == 0) ? 6 : 0;
+    int last_index = (newPos.player == 0) ? 11 : 5;
+    // only if there is at least more than 6 seeds then it could spill over to the other side
 
-            if (strcmp(capture_colour, "R") == 0 && red_seeds >= 2 && red_seeds <= 3) {
-                scores_gain += red_seeds;
-                cellscpy[cellid].total -= red_seeds;
-                cellscpy[cellid].red = 0;
-                if (cellscpy[cellid].special > 0) cellscpy[cellid].special = 0;
-            } else if (strcmp(capture_colour, "B") == 0 && black_seeds >= 2 && black_seeds <= 3) {
-                scores_gain += black_seeds;
-                cellscpy[cellid].total -= black_seeds;
-                cellscpy[cellid].black = 0;
-                if (cellscpy[cellid].special > 0) cellscpy[cellid].special = 0;
-            } else if (strcmp(capture_colour, "S") == 0) {
-                if ((black_seeds >= 2 && black_seeds <= 3) && (red_seeds >= 2 && red_seeds <= 3)) {
-                    strncpy(capture_colour, "S", 2);
-                    int total_seeds_capt = black_seeds + red_seeds - 1;
-                    cellscpy[cellid].total -= total_seeds_capt;
-                    scores_gain += total_seeds_capt;
-                    cellscpy[cellid].black = 0;
-                    cellscpy[cellid].red = 0;
-                    cellscpy[cellid].special = 0;
-                }
-                else if (black_seeds >= 2 && black_seeds <= 3) {
-                    strncpy(capture_colour, "B", 2);
-                    cellscpy[cellid].total -= black_seeds;
-                    scores_gain += black_seeds;
-                    cellscpy[cellid].black = 0;
-                    cellscpy[cellid].special = 0;
-                }
-                else if (red_seeds >= 2 && red_seeds <= 3) {
-                    strncpy(capture_colour, "R", 2);
-                    cellscpy[cellid].total -= red_seeds;
-                    scores_gain += red_seeds;
-                    cellscpy[cellid].red = 0;
-                    cellscpy[cellid].special = 0;
-                } else {
-                    capture = -1;
-                }
-            } else {
-                capture = -1;
-            }
+    int capture = 1;
+    int capt_index = newPos.last_pos;
+    if (newPos.last_pos > last_index) {
+        if (original_total_stones > 6 || looped == 1) {
+            capt_index = last_index;
         } else {
-            capture = -1;
-        }
-
-        if (stones.total == 0) {
-            break;
+            capture = 0;
         }
     }
+
+    int scores_gain = 0;
+    while (capture == 1) {
+        int black_seeds = cellscpy[capt_index].black + cellscpy[capt_index].special;
+        int red_seeds = cellscpy[capt_index].red + cellscpy[capt_index].special;
+
+        int capture_red = (red_seeds >= 2 && red_seeds <= 3) ? 1 : 0;
+        int capture_black = (black_seeds >= 2 && black_seeds <= 3) ? 1 : 0;
+
+        if (strcmp(capture_colour, "S") == 0) {
+            if (capture_black && capture_red) {
+                strncpy(capture_colour, "S", 2);
+                int total_seeds_capt = black_seeds + red_seeds - 1;
+                cellscpy[capt_index].total -= total_seeds_capt;
+                scores_gain += total_seeds_capt;
+                cellscpy[capt_index].black = 0;
+                cellscpy[capt_index].red = 0;
+                cellscpy[capt_index].special = 0;
+            }
+            else if (capture_black) {
+                strncpy(capture_colour, "B", 2);
+                cellscpy[capt_index].total -= black_seeds;
+                scores_gain += black_seeds;
+                cellscpy[capt_index].black = 0;
+                cellscpy[capt_index].special = 0;
+            }
+            else if (capture_red) {
+                strncpy(capture_colour, "R", 2);
+                cellscpy[capt_index].total -= red_seeds;
+                scores_gain += red_seeds;
+                cellscpy[capt_index].red = 0;
+                cellscpy[capt_index].special = 0;
+            } else {
+                capture = 0;
+            }
+        } else if (strcmp(capture_colour, "R") == 0 && capture_red) {
+            scores_gain += red_seeds;
+            cellscpy[capt_index].total -= red_seeds;
+            cellscpy[capt_index].red = 0;
+            if (cellscpy[capt_index].special > 0) cellscpy[capt_index].special = 0;
+        } else if (strcmp(capture_colour, "B") == 0 && capture_black) {
+            scores_gain += black_seeds;
+            cellscpy[capt_index].total -= black_seeds;
+            cellscpy[capt_index].black = 0;
+            if (cellscpy[capt_index].special > 0) cellscpy[capt_index].special = 0;
+        } else {
+            capture = 0;
+        }
+    }
+
     if (scores_gain > 0 && newPos.player == 0) {
         newPos.seeds_computer += scores_gain;
     } else if (scores_gain > 0 && newPos.player == 1) {
