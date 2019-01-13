@@ -171,7 +171,7 @@ void startGame(Pos position, int maxDepth, int first_player) {
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
             printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
-                position.move.hole + 1, position.move.colour, position.move.spos);
+                position.move.hole + 1, position.move.colour, position.move.spos- 1);
             fprintf(f, "Computer has played the move on hole %d, colour %s and special seed at %d.\n",
                 position.move.hole + 1, position.move.colour, position.move.spos);
             printf("Time taken for computer %f\n\n", elapsed);
@@ -429,9 +429,17 @@ Pos move(Pos position) {
     // the capture colour should be the last color being stored
     char capture_colour[2];
     if (strcmp(newPos.move.colour, "R") == 0) {
-        strncpy(capture_colour, "B", 2);
-    } else {
-        strncpy(capture_colour, "R", 2);
+        if (stones.black > 0) {
+            strncpy(capture_colour, "B", 2);
+        } else {
+            strncpy(capture_colour, "R", 2);
+        }
+    } else if (strcmp(newPos.move.colour, "B") == 0) {
+        if (stones.red > 0) {
+            strncpy(capture_colour, "R", 2);
+        } else {
+            strncpy(capture_colour, "B", 2);
+        }
     }
 
     int cellid = newPos.move.hole;
@@ -489,7 +497,7 @@ Pos move(Pos position) {
     }
 
     int scores_gain = 0;
-    while (capture == 1) {
+    while (capture == 1 && capt_index >= first_index) {
         int black_seeds = cellscpy[capt_index].black + cellscpy[capt_index].special;
         int red_seeds = cellscpy[capt_index].red + cellscpy[capt_index].special;
 
@@ -499,7 +507,7 @@ Pos move(Pos position) {
         if (strcmp(capture_colour, "S") == 0) {
             if (capture_black && capture_red) {
                 strncpy(capture_colour, "S", 2);
-                int total_seeds_capt = black_seeds + red_seeds - 1;
+                int total_seeds_capt = black_seeds + red_seeds - cellscpy[capt_index].special;
                 cellscpy[capt_index].total -= total_seeds_capt;
                 scores_gain += total_seeds_capt;
                 cellscpy[capt_index].black = 0;
@@ -535,6 +543,7 @@ Pos move(Pos position) {
         } else {
             capture = 0;
         }
+        capt_index--;
     }
 
     if (scores_gain > 0 && newPos.player == 0) {
