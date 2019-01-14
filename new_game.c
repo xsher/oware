@@ -49,11 +49,11 @@ Pos copyPos(Pos p1);
 Hole requestMove(int player, Cell * cells, int first_player);
 void requestSpecialSeed(Pos position, int first_player, int player);
 
-Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
+Move minimaxAlphaBeta(FILE * f, Pos position, bool maximisingPlayer, int alpha,
     int beta, int depth, int maxDepth, int parent_idx, int * count, int * move_count);
 Pos generatePosition(Pos position, int hole, int col, int spos,
     bool maximisingPlayer, int parent_idx, int * move_count);
-Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt);
+Pos computeComputerMove(FILE * f, Pos initial, int maxDepth, int * move_cnt);
 
 
 void printBoard(Cell * b, int seeds_computer, int seeds_player, int first_player) {
@@ -189,7 +189,7 @@ void startGame(Pos position, int maxDepth, int first_player) {
             struct timeval start, end;
             gettimeofday(&start, NULL);
 
-            position = computeComputerMove(position, maxDepth, &move_counter);
+            position = computeComputerMove(f, position, maxDepth, &move_counter);
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
@@ -213,7 +213,7 @@ void startGame(Pos position, int maxDepth, int first_player) {
     printf("GAME OVER.\n");
 }
 
-Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
+Pos computeComputerMove(FILE * f, Pos initial, int maxDepth, int * move_cnt) {
     // Initial move is a move by player 1
     initial.player = 1;
 
@@ -223,10 +223,13 @@ Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt) {
     // the first move that is feeded is always the move that has been done by the player
     int counter = 0;
     int * move_counter = move_cnt;
-    nextMove = minimaxAlphaBeta(initial, maximisingPlayer, -76, 76,
+    fprintf(f, "Calling minimaxAlphaBeta\n");
+    nextMove = minimaxAlphaBeta(f, initial, maximisingPlayer, -76, 76,
                                 maxDepth, maxDepth, 0, &counter, move_counter);
 
     printf("Number of nodes traversed: %d\n", counter);
+    fprintf(f, "Number of nodes traversed: %d\n", counter);
+    fprintf(f, "Score for the move: %d\n", nextMove.score);
     printf("Score for the move: %d\n", nextMove.score);
     return nextMove.position;
 }
@@ -257,6 +260,7 @@ Pos copyPos(Pos p1) {
     p2.valid_move = p1.valid_move;         // 0 if not valid
     p2.current_idx = p1.current_idx;
     p2.move = p1.move;                     // which hole was chosen
+    p2.seeds_diff = p1.seeds_diff;
     return p2;
 }
 
@@ -289,7 +293,7 @@ Pos generatePosition(Pos position, int hole, int col, int spos, bool maximisingP
     return newPos;
 }
 
-Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
+Move minimaxAlphaBeta(FILE * f, Pos position, bool maximisingPlayer, int alpha, int beta,
                 int depth, int maxDepth, int parent_idx, int * count, int * move_count) {
     *count += 1;
     int * counter = count;
@@ -300,9 +304,13 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
         bool game_ending = (76 - position.seeds_player - position.seeds_computer < 25) ? true : false;
 
         Move move;
-        move.score = (game_ending) ? position.seeds_diff : position.evaluation;
+        position.evaluation = evaluate_score(position);
+        move.score = (game_ending == 1) ? position.seeds_diff : position.evaluation;
         move.position = copyPos(position);
         move.leaf = copyPos(position);
+
+        fprintf(f, "Depth is %d, game ending is %d, score %d, position.move.hole %d, position.move.colour %s\n",
+            depth, game_ending, move.score, position.move.hole, position.move.colour);
         return move;
     }
 
@@ -329,13 +337,16 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
                                 parent_idx, move_counter);
                 newPos.current_idx = idx + index;
 
+                fprintf(f, "Depth is %d, parent_idx is %d, current_idx %d, score %d,  newPos.move.hole %d, newPos.move.colour %s newPos score %d\n",
+                    depth, parent_idx, newPos.current_idx, newPos.evaluation, newPos.move.hole, newPos.move.colour, newPos.evaluation);
+
                 if (newPos.valid_move == 1) {
 
                     Move childPos;
                     Pos feedPos = copyPos(newPos);
 
                     bool toMax = maximisingPlayer ? false : true;
-                    childPos = minimaxAlphaBeta(feedPos, toMax, alpha, beta, newDepth, maxDepth,
+                    childPos = minimaxAlphaBeta(f, feedPos, toMax, alpha, beta, newDepth, maxDepth,
                                 index + idx, counter, move_counter);
 
                     if (first_valid == 0) {
@@ -344,6 +355,8 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
                         bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
                         bestMove.leaf = (newDepth == 0) ? copyPos(childPos.position) : childPos.leaf;
                         first_valid = 1;
+                        fprintf(f, "Initializing the first valid depth %d bestMove.leaf pos %d, bestMove.pos %d, bestMove.score %d\n",
+                            depth, bestMove.leaf.move.hole, bestMove.position.move.hole, bestMove.score);
 
                     } else if ((maximisingPlayer && childPos.score > bestMove.score) ||
                             (!maximisingPlayer && childPos.score < bestMove.score)) {
@@ -351,6 +364,9 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
                         bestMove.score = childPos.score;
                         bestMove.position = (newPos.current_idx == 0) ? copyPos(childPos.position) : copyPos(newPos);
                         if (newDepth == 0 ) bestMove.leaf = copyPos(childPos.position);
+
+                        fprintf(f, "Found better move at depth %d bestMove.leaf pos %d, bestMove.pos %d, bestMove.score %d\n",
+                            depth, bestMove.leaf.move.hole, bestMove.position.move.hole, bestMove.score);
 
                         if (maximisingPlayer && bestMove.score > alpha) {
                             alpha = bestMove.score;
@@ -395,13 +411,19 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
             bestMove.position = bstPos;
             bestMove.score = bstPos.evaluation;
         }
+        fprintf(f, "No bestMove found, random iniaitlization score is %d\n", bestMove.score); 
+
     }
+
+    fprintf(f, "BestMove returned position %d, colour %s, spos %d, score %d\n",
+        bestMove.position.move.hole, bestMove.position.move.colour, bestMove.position.move.spos, bestMove.score);
     return bestMove;
 }
 
 Hole requestMove(int player, Cell * cells, int first_player) {
     Hole request;
 
+    int check_idx;
     if (player == first_player) {
         do {
             printf("Which position to sow? Choices: ");
@@ -412,7 +434,9 @@ Hole requestMove(int player, Cell * cells, int first_player) {
             printf("\t");
             scanf("%d", &request.hole);
             request.hole -= 1;
-        } while(!(request.hole >= 0 && request.hole <= 5) || cells[request.hole].total == 0);
+            check_idx = (player == 0) ? request.hole : request.hole + 6;
+            printf("request hole is %d, idx %d, idx total %d", request.hole, check_idx, cells[check_idx].total);
+        } while(!(request.hole >= 0 && request.hole <= 5) || cells[check_idx].total == 0);
     } else {
         do {
             printf("Which position to sow? Choices: ");
@@ -422,7 +446,8 @@ Hole requestMove(int player, Cell * cells, int first_player) {
             }
             scanf("%d", &request.hole);
             request.hole -= 1;
-        } while(!(request.hole >= 6 && request.hole <= 11) || cells[request.hole].total == 0);
+            check_idx = (player == 1) ? request.hole : request.hole - 6;
+        } while(!(request.hole >= 6 && request.hole <= 11) || cells[check_idx].total == 0);
     }
 
     if (player == first_player && player == 1) {
