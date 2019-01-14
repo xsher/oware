@@ -46,8 +46,8 @@ int capture(Hole move, int last_pos, int looped, int player, Cell * cells);
 int evaluate_score(Pos position);
 int evaluate_seeds(Pos position);
 Pos copyPos(Pos p1);
-Hole requestMove(int player, Cell * cells);
-void requestSpecialSeed(Pos position, int first_player);
+Hole requestMove(int player, Cell * cells, int first_player);
+void requestSpecialSeed(Pos position, int first_player, int player);
 
 Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha,
     int beta, int depth, int maxDepth, int parent_idx, int * count, int * move_count);
@@ -57,20 +57,37 @@ Pos computeComputerMove(Pos initial, int maxDepth, int * move_cnt);
 
 
 void printBoard(Cell * b, int seeds_computer, int seeds_player, int first_player) {
-    printf("\nComputer side\n");
-    printf("             1           2            3            4             5           6\n");
-    printf("-------------------------------------------------------------------------------------------\n");
-    printf("|%5d|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5s|\n", seeds_computer,
-            b[0].red, b[0].black, b[0].special, b[1].red, b[1].black, b[1].special, b[2].red, b[2].black, b[2].special,
-            b[3].red, b[3].black, b[3].special, b[4].red, b[4].black, b[4].special, b[5].red, b[5].black, b[5].special, "");
-    printf("       -----------------------------------------------------------------------------      \n");
-    printf("|%5s|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5d|\n", "",
-            b[11].red, b[11].black, b[11].special, b[10].red, b[10].black, b[10].special, b[9].red, b[9].black, b[9].special,
-            b[8].red, b[8].black, b[8].special, b[7].red, b[7].black, b[7].special, b[6].red, b[6].black, b[6].special,
-            seeds_player);
-    printf("-------------------------------------------------------------------------------------------\n");
-    printf("           12            11           10           9             8           7\n");
-    printf("Player side\n\n");
+    if (first_player == 0) {
+        printf("\nComputer side\n");
+        printf("             1           2            3            4             5           6\n");
+        printf("-------------------------------------------------------------------------------------------\n");
+        printf("|%5d|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5s|\n", seeds_computer,
+                b[0].red, b[0].black, b[0].special, b[1].red, b[1].black, b[1].special, b[2].red, b[2].black, b[2].special,
+                b[3].red, b[3].black, b[3].special, b[4].red, b[4].black, b[4].special, b[5].red, b[5].black, b[5].special, "");
+        printf("       -----------------------------------------------------------------------------      \n");
+        printf("|%5s|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5d|\n", "",
+                b[11].red, b[11].black, b[11].special, b[10].red, b[10].black, b[10].special, b[9].red, b[9].black, b[9].special,
+                b[8].red, b[8].black, b[8].special, b[7].red, b[7].black, b[7].special, b[6].red, b[6].black, b[6].special,
+                seeds_player);
+        printf("-------------------------------------------------------------------------------------------\n");
+        printf("           12            11           10           9             8           7\n");
+        printf("Player side\n\n");
+    } else {
+        printf("\nPlayer side\n");
+        printf("             1           2            3            4             5           6\n");
+        printf("-------------------------------------------------------------------------------------------\n");
+        printf("|%5d|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5s|\n", seeds_player,
+                b[6].red, b[6].black, b[6].special, b[7].red, b[7].black, b[7].special, b[8].red, b[8].black, b[8].special,
+                b[9].red, b[9].black, b[9].special, b[10].red, b[10].black, b[10].special, b[11].red, b[11].black, b[11].special, "");
+        printf("       -----------------------------------------------------------------------------      \n");
+        printf("|%5s|%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%2dR %2dB %2dS |%5d|\n", "", 
+                b[5].red, b[5].black, b[5].special, b[4].red, b[4].black, b[4].special, b[3].red, b[3].black, b[3].special,
+                b[2].red, b[2].black, b[2].special, b[1].red, b[1].black, b[1].special, b[0].red, b[0].black, b[0].special,
+                seeds_computer);
+        printf("-------------------------------------------------------------------------------------------\n");
+        printf("           12            11           10           9             8           7\n");
+        printf("Computer side\n\n");
+    }
 }
 
 void fprintBoard(FILE * f, Cell * b, int seeds_computer, int seeds_player, int first_player) {
@@ -119,19 +136,19 @@ int main(void) {
 
     int first_player = position.player;
     printf("Player %d", position.player);
-    requestSpecialSeed(position, first_player);
+    requestSpecialSeed(position, first_player, position.player);
     printf("Board status after placing special seed.\n");
     printBoard(position.cells, position.seeds_computer, position.seeds_player, first_player);
 
     printf("Player %d ", (position.player == 0) ? 1 : 0);
-    requestSpecialSeed(position, first_player);
+    requestSpecialSeed(position, first_player, (position.player == 0) ? 1: 0 );
     printf("Board status after placing special seed.\n");
     printBoard(position.cells, position.seeds_computer, position.seeds_player, first_player);
 
     startGame(position, maxDepth, first_player);
 }
 
-void requestSpecialSeed(Pos position, int start_player) {
+void requestSpecialSeed(Pos position, int start_player, int player) {
     int special_hole;
 
     do {
@@ -139,6 +156,12 @@ void requestSpecialSeed(Pos position, int start_player) {
         scanf("%d", &special_hole);
         special_hole -= 1;
     } while (!(special_hole >= 0 && special_hole <= 11));
+
+    if (player == start_player && player == 1) {
+        special_hole += 6;
+    } else if (player != start_player && player == 0) {
+        special_hole -= 6;
+    }
 
     position.cells[special_hole].special += 1;
     position.cells[special_hole].total += 1;
@@ -158,7 +181,7 @@ void startGame(Pos position, int maxDepth, int first_player) {
         printf("\nPlayer %d turn\n", position.player);
 
         if (position.player == 1) {
-            position.move = requestMove(position.player, position.cells);
+            position.move = requestMove(position.player, position.cells, first_player);
             position = move(position);
             fprintf(f, "Player has played the move on hole %d, colour %s and special seed at %d.\n",
                 position.move.hole + 1, position.move.colour, position.move.spos);
@@ -170,10 +193,12 @@ void startGame(Pos position, int maxDepth, int first_player) {
             gettimeofday(&end, NULL);
             double elapsed = (end.tv_sec - start.tv_sec) +
               ((end.tv_usec - start.tv_usec)/1000000.0);
+            int pos_moved = position.move.hole + 1;
+            if (first_player != 0) pos_moved += 6;
             printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
-                position.move.hole + 1, position.move.colour, position.move.spos- 1);
+                pos_moved, position.move.colour, position.move.spos- 1);
             fprintf(f, "Computer has played the move on hole %d, colour %s and special seed at %d.\n",
-                position.move.hole + 1, position.move.colour, position.move.spos);
+                pos_moved, position.move.colour, position.move.spos);
             printf("Time taken for computer %f\n\n", elapsed);
         }
 
@@ -374,14 +399,15 @@ Move minimaxAlphaBeta(Pos position, bool maximisingPlayer, int alpha, int beta,
     return bestMove;
 }
 
-Hole requestMove(int player, Cell * cells) {
+Hole requestMove(int player, Cell * cells, int first_player) {
     Hole request;
 
-    if (player == 0) {
+    if (player == first_player) {
         do {
             printf("Which position to sow? Choices: ");
             for (int i=0; i < 6; i++) {
-                if (cells[i].total > 0) printf("%d ", i);
+                int idx = (player == 0) ? i : i+6;
+                if (cells[idx].total > 0) printf("%d ", i+1);
             }
             printf("\t");
             scanf("%d", &request.hole);
@@ -391,11 +417,18 @@ Hole requestMove(int player, Cell * cells) {
         do {
             printf("Which position to sow? Choices: ");
             for (int i=6; i < 12; i++) {
-                if (cells[i].total > 0) printf("%d ", i);
+                int idx = (player == 1) ? i : i-6;
+                if (cells[idx].total > 0) printf("%d ", i+1);
             }
             scanf("%d", &request.hole);
             request.hole -= 1;
         } while(!(request.hole >= 6 && request.hole <= 11) || cells[request.hole].total == 0);
+    }
+
+    if (player == first_player && player == 1) {
+        request.hole += 6;
+    } else if (player != first_player && player == 0) {
+        request.hole -= 6;
     }
 
     do {
