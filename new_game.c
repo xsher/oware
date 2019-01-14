@@ -196,7 +196,7 @@ void startGame(Pos position, int maxDepth, int first_player) {
             int pos_moved = position.move.hole + 1;
             if (first_player != 0) pos_moved += 6;
             printf("Computer has played the move on hole %d, colour %s and special seed at %d.\n",
-                pos_moved, position.move.colour, position.move.spos- 1);
+                pos_moved, position.move.colour, position.move.spos);
             fprintf(f, "Computer has played the move on hole %d, colour %s and special seed at %d.\n",
                 pos_moved, position.move.colour, position.move.spos);
             printf("Time taken for computer %f\n\n", elapsed);
@@ -260,6 +260,7 @@ Pos copyPos(Pos p1) {
     p2.valid_move = p1.valid_move;         // 0 if not valid
     p2.current_idx = p1.current_idx;
     p2.move = p1.move;                     // which hole was chosen
+    p2.move.spos = p1.move.spos;
     p2.seeds_diff = p1.seeds_diff;
     return p2;
 }
@@ -309,8 +310,8 @@ Move minimaxAlphaBeta(FILE * f, Pos position, bool maximisingPlayer, int alpha, 
         move.position = copyPos(position);
         move.leaf = copyPos(position);
 
-        fprintf(f, "Depth is %d, game ending is %d, score %d, position.move.hole %d, position.move.colour %s\n",
-            depth, game_ending, move.score, position.move.hole, position.move.colour);
+        fprintf(f, "Depth is %d, game ending is %d, score %d, position.move.hole %d, position.move.colour %s position.move.spos %d\n",
+            depth, game_ending, move.score, position.move.hole, position.move.colour, position.move.spos);
         return move;
     }
 
@@ -337,8 +338,8 @@ Move minimaxAlphaBeta(FILE * f, Pos position, bool maximisingPlayer, int alpha, 
                                 parent_idx, move_counter);
                 newPos.current_idx = idx + index;
 
-                fprintf(f, "Depth is %d, parent_idx is %d, current_idx %d, score %d,  newPos.move.hole %d, newPos.move.colour %s newPos score %d\n",
-                    depth, parent_idx, newPos.current_idx, newPos.evaluation, newPos.move.hole, newPos.move.colour, newPos.evaluation);
+                fprintf(f, "Depth is %d, parent_idx is %d, current_idx %d, score %d,  newPos.move.hole %d, newPos.move.colour %s newPos score %d movespos %d l %d\n",
+                    depth, parent_idx, newPos.current_idx, newPos.evaluation, newPos.move.hole, newPos.move.colour, newPos.evaluation, newPos.move.spos, l);
 
                 if (newPos.valid_move == 1) {
 
@@ -405,6 +406,7 @@ Move minimaxAlphaBeta(FILE * f, Pos position, bool maximisingPlayer, int alpha, 
             minhole += 1;
         }
 
+        fprintf(f, "SPOS now when trying to maximis %d\n", position.move.spos);
         Pos bstPos = generatePosition(position, minhole, 1, position.move.spos,
                         maximisingPlayer, parent_idx, move_counter);
         if (bstPos.valid_move == 1) {
@@ -504,15 +506,21 @@ Pos move(Pos position) {
     int idx = 1;
     int pos_id;
 
+    // quick hack to make sure that special seed does not disappear
+    if (stones.special > 0 && newPos.move.spos <= 0) {
+        newPos.move.spos = 1;
+    }
+    int special_pos = newPos.move.spos;
+
     while (stones.total > 0) {
         cellid++; // in order to get final index at the end
         pos_id = cellid % 12;
 
         if (pos_id == newPos.move.hole) continue;
-        if (idx == newPos.move.spos && stones.special > 0) {
+        if (idx == special_pos && stones.special > 0) {
             cellscpy[pos_id].special += 1;
             stones.special--;
-            newPos.move.spos++; // just in case if there is 2 special seeds
+            special_pos++; // just in case if there is 2 special seeds
             // if special is the last seed then overwrite it
             if (stones.total == 1) {
                 strncpy(capture_colour, "S", 2);
